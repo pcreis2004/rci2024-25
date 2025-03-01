@@ -1,11 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/select.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-
+#include <arpa/inet.h>
 
 typedef struct{
 	char ip[16];
@@ -26,9 +27,9 @@ typedef struct{
 	int capacityInternals;
 }NodeData;
 
-void init_node(int cache_size, char *ip, int tcp_port, char *reg_ip, int reg_udp);
+void init_node(NodeData myNode,int cache_size, char *reg_ip, int reg_udp);
 
-int init_socket_listening(int port);
+int init_socket_listening(int port,char ip[16]);
 
 int main(int argc, char *argv[]){
 
@@ -37,7 +38,7 @@ int main(int argc, char *argv[]){
         printf("Usage: %s cache IP TCP [regIP] [regUDP]\n", argv[0]);
         return 1;
     }
-	NodeID my_id;
+	NodeData my_id;
 	strncpy(my_id.ip, argv[2], sizeof(my_id.ip));
     my_id.tcp_port = atoi(argv[3]);
     char reg_server_ip[16];      // Registration server IP
@@ -63,21 +64,54 @@ int main(int argc, char *argv[]){
 
 
     // Initialize node
-    init_node(cache_size, my_id.ip, my_id.tcp_port, reg_server_ip, reg_server_port);
+    init_node(my_id,cache_size, reg_server_ip, reg_server_port);
+
+	int counter;
+	printf("NDN Node started. Enter commands:\n");
+    while (1) {
+        printf("> ");
+		counter=select(int nfds, fd_set *restrict readfds, fd_set *restrict writefds, fd_set *restrict exceptfds, struct timeval *restrict timeout);//completar
+		for (i=0; i<counter ; i++) {
+
+			if(IS_SET(0,&sockerset))
+
+			if(list.socket)
+
+			if(externo){
+			}
+		
+		}
+		if (fgets(command, sizeof(command), stdin) == NULL) {
+            break;
+        }
+        
+        // Remove newline
+        command[strcspn(command, "\n")] = 0;
+        
+        // Process command
+        process_user_command(command);
+    }
 	return 0;
 
 
 }
 
-void init_node(int cache_size, char *ip, int tcp_port, char *reg_ip, int reg_udp) {
+void init_node(NodeData myNode,int cache_size, char *reg_ip, int reg_udp) {
+	
+	// Initialize topology information
+   memset(&myNode.external, 0, sizeof(NodeID));
+   memset(&myNode.safeguard, 0, sizeof(NodeID));
+   myNode.internal = NULL;
+   myNode.numInternals = 0;
+   myNode.capacityInternals = 0;
 
-   init_socket_listening(tcp_port);
+   myNode.socket_listening=init_socket_listening(myNode.tcp_port,myNode.ip);
    
 }
 
-int init_socket_listening(int port) {
+int init_socket_listening(int port,char ip[16]) {
     int sock;
-    struct sockaddr_in server_addri;
+    struct sockaddr_in server_addr;
     
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
@@ -88,8 +122,15 @@ int init_socket_listening(int port) {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port);
+    //server_addr.sin_port = htons(port);
     
+	if (inet_pton(AF_INET,ip,&server_addr.sin_addr)<=0) {
+		perror("bind");
+		close(sock);
+		return -1;
+	
+	}
+
     if (bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("bind");
         close(sock);
