@@ -31,7 +31,7 @@ typedef struct {
 
 void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp);
 int init_socket_listening(int port, char *ip);
-void checkFD(NodeData *myNode, fd_set *master_fds, int *max_fd);
+void handle_command(char *command);
 
 int main(int argc, char *argv[]) {
     char command[256];
@@ -85,8 +85,52 @@ int main(int argc, char *argv[]) {
             perror("select");
             exit(1);
         }
-        
-        checkFD(&my_id, &master_fds, &max_fd);
+        char buffer[BUFFER_SIZE];
+        memset(buffer, 0, BUFFER_SIZE);  // Clear the buffer before reading new data 
+        struct sockaddr addr;
+        socklen_t addrlen;
+        int new_fd;
+        for (int i = 0; i <= max_fd; i++) {
+            // check if "i" is set as a file descriptor FD_ISSET
+            if (FD_ISSET(i, &read_fds)) { 
+                // CASE 1: New connection request on the listener socket
+                if (i == my_id.socket_listening) {              
+                    addrlen = sizeof addr;
+                    new_fd = accept(my_id.socket_listening, &addr, &addrlen);
+                    if (new_fd == -1) {
+                        perror("accept");
+                    } else {
+                        FD_SET(new_fd, &master_fds); // Add new FD to master set (notice we are not adding it to the read_fds set, 
+                                                     // which is the set being altered by the select() function).
+                        if (new_fd > max_fd) max_fd = new_fd;
+                        printf("New connection established: FD %d\n", new_fd);
+                    }
+                }
+                // CASE 2: Data received from an existing client
+                else {
+                    int n = read(i, buffer, BUFFER_SIZE);
+                    if (n <= 0) {                   // Connection closed or error
+                        if (n == 0) {
+                            printf("Client on FD %d disconnected.\n", i);
+                        } else {
+                            perror("read");
+                        }
+                        close(i);
+                        FD_CLR(i, &master_fds);     // Remove closed connection from master set
+                    } else {
+
+                        // Echo the message back to the client
+                        printf("Received from FD %d: %s\n", i, buffer);
+                         // Remover o caractere de nova linha no final do comando
+                         buffer[strcspn(command, "\n")] = '\0';
+                         handle_command(buffer);
+                        if (write(i, buffer, n) == -1) {
+                            perror("write");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     return 0;
@@ -119,7 +163,7 @@ int init_socket_listening(int port, char *ip) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if ((errcode = getaddrinfo(NULL, port_str, &hints, &res)) != 0) {
+    if ((errcode = getaddrinfo(ip, port_str, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
         exit(1);
     }
@@ -141,43 +185,20 @@ int init_socket_listening(int port, char *ip) {
     return fd;
 }
 
-void checkFD(NodeData *myNode, fd_set *master_fds, int *max_fd) {
-    char buffer[BUFFER_SIZE];
-    memset(buffer, 0, BUFFER_SIZE);
+void handle_command(char *command) {
+    // Aqui você pode adicionar a lógica para processar os comandos
+    printf("Comando recebido: %s\n", command);
 
-    struct sockaddr addr;
-    socklen_t addrlen;
-    int new_fd;
-
-    for (int i = 0; i <= *max_fd; i++) {
-        if (FD_ISSET(i, master_fds)) {
-            if (i == myNode->socket_listening) {
-                addrlen = sizeof addr;
-                new_fd = accept(myNode->socket_listening, &addr, &addrlen);
-                if (new_fd == -1) {
-                    perror("accept");
-                } else {
-                    FD_SET(new_fd, master_fds);
-                    if (new_fd > *max_fd) *max_fd = new_fd;
-                    printf("New connection established: FD %d\n", new_fd);
-                }
-            } else {
-                int n = read(i, buffer, BUFFER_SIZE);
-                if (n <= 0) {
-                    if (n == 0) {
-                        printf("Client on FD %d disconnected.\n", i);
-                    } else {
-                        perror("read");
-                    }
-                    close(i);
-                    FD_CLR(i, master_fds);
-                } else {
-                    printf("Received from FD %d: %s\n", i, buffer);
-                    if (write(i, buffer, n) == -1) {
-                        perror("write");
-                    }
-                }
-            }
-        }
+    // Exemplo de comando: "help"
+    if (strcmp(command, "help") == 0) {
+        printf("Comandos disponíveis:\n");
+        printf("  help - Mostra esta mensagem de ajuda\n");
+        printf("  exit - Sai do programa\n");
+        // Adicione mais comandos conforme necessário
+    } else if (strcmp(command, "exit") == 0) {
+        printf("Saindo...\n");
+        exit(0);
+    } else {
+        printf("Comando desconhecido: %s\n", command);
     }
 }

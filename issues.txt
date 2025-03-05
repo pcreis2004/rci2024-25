@@ -6,8 +6,8 @@ Issues:
 
 
 
-
-
 Resolvido:
+	o servidor não é tão rápido como o da aula
+
 	getaddrinfo(NULL,port_str,&hints,&res) --- Assim funciona
 	getaddrinfo( IP do thinkpad em formato str ,port_str,&hints,&res) --- Não devia ser assim???
