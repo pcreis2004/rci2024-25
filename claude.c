@@ -1,62 +1,57 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/select.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/time.h>  
 
-// Forward declaration for NodeID struct (for self-referential pointer)
-typedef struct NodeID NodeID;
+#define BUFFER_SIZE 128
 
-// Define the NodeID struct
-struct NodeID {
-    char ip[16];
-    int tcp_port;
-    int socket;
-    NodeID *next;
-};
+typedef struct{
+	char ip[16];
+	int tcp_port;
+	int socket_listening;
+	struct NodeID *next;
+}NodeID;
 
-typedef struct {
-    char ip[16];
-    int tcp_port;
-    int socket_listening;
-    NodeID external;
-    NodeID safeguard;
-    NodeID *internal;
-    int numInternals;
-    int capacityInternals;
-} NodeData;
 
-// Global variables
-NodeData myNode;
-char reg_server_ip[16]; // Registration server IP
-int reg_server_port;    // Registration server UDP port
-int cache_size;         // Cache size
-int udp_socket;         // UDP socket for registration server
+typedef struct{
+	char ip[16];
+	int tcp_port;
+	int socket_listening;
+	NodeID external;
+	NodeID safeguard;
+	NodeID *internal;
+	int numInternals;
+	int capacityInternals;
+}NodeData;
 
-// Function prototypes
-void init_node(int cache_size, char *ip, int tcp_port, char *reg_ip, int reg_udp);
-int init_socket_listening(int port);
-void process_user_command(char *command);
-int setup_udp_client();
+void init_node(NodeData myNode,int cache_size, char *reg_ip, int reg_udp);
 
-int main(int argc, char *argv[]) {
+int init_socket_listening(int port,char ip[16]);
+
+int main(int argc, char *argv[]){
+
     char command[256];
-    
     if (argc < 4) {
         printf("Usage: %s cache IP TCP [regIP] [regUDP]\n", argv[0]);
         return 1;
     }
+	NodeData my_id;
+	strncpy(my_id.ip, argv[2], sizeof(my_id.ip));
+    my_id.tcp_port = atoi(argv[3]);
     
-    // Parse arguments
-    cache_size = atoi(argv[1]);
+    char reg_server_ip[16];      // Registration server IP
+    int reg_server_port;         // Registration server UDP port
+    int cache_size;              // Cache size
+    int max_fd;
     
-    strncpy(myNode.ip, argv[2], sizeof(myNode.ip));
-    myNode.tcp_port = atoi(argv[3]);
-    
+    fd_set master_fds, read_fds; // File descriptor sets
+  
     if (argc >= 5) {
         strncpy(reg_server_ip, argv[4], sizeof(reg_server_ip));
     } else {
@@ -69,121 +64,142 @@ int main(int argc, char *argv[]) {
         reg_server_port = 59000;
     }
     
-    printf("Configuration:\n Cache: %d\n IP: %s\n TCP: %d\n RegIP: %s\n RegUDP: %d\n",
-           cache_size, myNode.ip, myNode.tcp_port, reg_server_ip, reg_server_port);
     
+    printf("Configuração:\n Cache: %d\n IP: %s\n TCP: %d\n RegIP: %s\n RegUDP: %d\n", 
+        cache_size, my_id.ip, my_id.tcp_port, reg_server_ip, reg_server_port);
+
+
+    printf("inicializar nó\n");
     // Initialize node
-    init_node(cache_size, myNode.ip, myNode.tcp_port, reg_server_ip, reg_server_port);
-    
-    // Main command loop
-    printf("NDN Node started. Enter commands:\n");
+    init_node(my_id,cache_size, reg_server_ip, reg_server_port);
+
+	int counter;
+	printf("NDN Node started. Enter commands:\n");
+
+    FD_ZERO(&master_fds); 		        // Clears all FDs from the set to start fresh
+    FD_SET(my_id.socket_listening, &master_fds);   // Adds the listening socket to the set
+    max_fd = my_id.socket_listening;  		        // Keeps track of the highest FD value for "select()" (When starting, 
+     					                // the heighest value is necessarily the FD of the listening socket, 
+     					                // since no other socket is active)
+
     while (1) {
+
+	    read_fds=master_fds;
         printf("> ");
-        if (fgets(command, sizeof(command), stdin) == NULL) {
-            break;
+        //     //MELHORAR O LOOP
+        
+        counter = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+        if (counter == -1) {
+            perror("select");
+            exit(1);
         }
-        
-        // Remove newline
-        command[strcspn(command, "\n")] = 0;
-        
-        // Process command
-        process_user_command(command);
+		
+        checkFd();
+
     }
-    
-    return 0;
+	return 0;
+
+
 }
 
-void init_node(int cache_size, char *ip, int tcp_port, char *reg_ip, int reg_udp) {
-    // Initialize topology information
-    memset(&myNode.external, 0, sizeof(NodeID));
-    memset(&myNode.safeguard, 0, sizeof(NodeID));
-    myNode.internal = NULL;
-    myNode.numInternals = 0;
-    myNode.capacityInternals = 0;
-    
-    // Initialize listening TCP socket
-    myNode.socket_listening = init_socket_listening(tcp_port);
-    if (myNode.socket_listening < 0) {
-        fprintf(stderr, "Failed to initialize listening socket\n");
-        exit(1);
-    }
-    
-    // Initialize UDP socket for communication with registration server
-    udp_socket = setup_udp_client();
-    if (udp_socket < 0) {
-        fprintf(stderr, "Failed to initialize UDP socket\n");
-        exit(1);
-    }
-    
-    printf("Node initialized with ID: %s %d\n", ip, tcp_port);
-    printf("Listening socket: %d\n", myNode.socket_listening);
+void init_node(NodeData myNode,int cache_size, char *reg_ip, int reg_udp) {
+	
+	// Initialize topology information
+   memset(&myNode.external, 0, sizeof(NodeID));
+   memset(&myNode.safeguard, 0, sizeof(NodeID));
+   myNode.internal = NULL;
+   myNode.numInternals = 0;
+   myNode.capacityInternals = 0;
+
+   myNode.socket_listening=init_socket_listening(myNode.tcp_port,myNode.ip);
+   
 }
 
-int init_socket_listening(int port) {
-    int sock;
-    struct sockaddr_in server_addr;
-    
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
+
+int init_socket_listening(int port, char ip[16]){
+
+    struct addrinfo hints,*res;
+    int fd,newfd,errcode; ssize_t n,nw;
+    struct sockaddr addr; socklen_t addrlen;
+    char *ptr,buffer[128],port_str[6];
+
+    sprintf(port_str,"%d",port);
+
+    if((fd=socket(AF_INET,SOCK_STREAM,0))==-1){//create the socket
         perror("socket");
-        return -1;
+        exit(1);
     }
-    
-    // Enable address reuse
-    int opt = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        perror("setsockopt");
-        close(sock);
-        return -1;
+    //error
+
+    memset(&hints,0,sizeof hints);//zero out the hint structures
+
+    hints.ai_family=AF_INET;//IPv4
+    hints.ai_socktype=SOCK_STREAM;//TCP socket
+    hints.ai_flags=AI_PASSIVE;
+    //Get address info for binding the socket 
+    if((errcode=getaddrinfo(ip,port_str,&hints,&res))!=0){//AQUI NÂO È SUPOSTO COLOCAR O IP DO NÓ????
+        perror("getaddrinfo");
+        exit(1);
     }
-    
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port);
-    
-    if (bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+
+    //bind socket to specified port and ip address
+    if(bind(fd,res->ai_addr,res->ai_addrlen)==-1){
         perror("bind");
-        close(sock);
-        return -1;
+        exit(1);
     }
-    
-    if (listen(sock, 5) < 0) {
+
+    freeaddrinfo(res);
+
+    // start listening for incoming connections 
+    if(listen(fd,5)==-1){
         perror("listen");
-        close(sock);
-        return -1;
+        exit(1);
     }
-    
-    printf("Listening on port %d\n", port);
-    return sock;
+    printf("Node %s is listening on port %s...\n", ip,port_str);
+    return fd;
 }
 
-int setup_udp_client() {
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0) {
-        perror("socket");
-        return -1;
-    }
-    return sock;
-}
 
-void process_user_command(char *command) {
-    char cmd[32];
+void checkFD(){
     
-    // Parse command
-    if (sscanf(command, "%s", cmd) < 1) {
-        return;
-    }
-    
-    // Handle commands (just echoing for now)
-    printf("Command received: %s\n", command);
-    
-    // Implement actual command handling here
-    if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "x") == 0) {
-        printf("Exiting application...\n");
-        // Clean up resources
-        close(myNode.socket_listening);
-        close(udp_socket);
-        exit(0);
-    }
+    memset(buffer, 0, BUFFER_SIZE);  // Clear the buffer before reading new data 
+        for (int i = 0; i <= max_fd; i++) {
+            // check if "i" is set as a file descriptor FD_ISSET
+            if (FD_ISSET(i, &read_fds)) { 
+                // CASE 1: New connection request on the listener socket
+                if (i == listener_fd) {              
+                    addrlen = sizeof addr;
+                    new_fd = accept(listener_fd, &addr, &addrlen);
+                    if (new_fd == -1) {
+                        perror("accept");
+                    } else {
+                        FD_SET(new_fd, &master_fds); // Add new FD to master set (notice we are not adding it to the read_fds set, 
+                                                     // which is the set being altered by the select() function).
+                        if (new_fd > max_fd) max_fd = new_fd;
+                        printf("New connection established: FD %d\n", new_fd);
+                    }
+                }
+                // CASE 2: Data received from an existing client
+                else {
+                    int n = read(i, buffer, BUFFER_SIZE);
+                    if (n <= 0) {                   // Connection closed or error
+                        if (n == 0) {
+                            printf("Client on FD %d disconnected.\n", i);
+                        } else {
+                            perror("read");
+                        }
+                        close(i);
+                        FD_CLR(i, &master_fds);     // Remove closed connection from master set
+                    } else {
+                        // Echo the message back to the client
+                        printf("Received from FD %d: %s\n", i, buffer);
+                        if (write(i, buffer, n) == -1) {
+                            perror("write");
+                        }
+                    }
+                }
+            }
+        }
+
+
 }

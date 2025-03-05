@@ -1,0 +1,13 @@
+Ip do thinkpad 192.168.1.175
+Comando a testar ./ndn 100 192.168.1.175 5000 193.136.138.142 59000
+
+
+Issues:
+
+
+
+
+
+Resolvido:
+	getaddrinfo(NULL,port_str,&hints,&res) --- Assim funciona
+	getaddrinfo( IP do thinkpad em formato str ,port_str,&hints,&res) --- Não devia ser assim???
