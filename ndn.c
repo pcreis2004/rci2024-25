@@ -31,7 +31,8 @@ typedef struct {
 
 void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp);
 int init_socket_listening(int port, char *ip);
-void handle_command(char *command);
+void handle_command(char *command,NodeData *myNode);
+NodeData djoin(NodeData *myNode);
 
 int main(int argc, char *argv[]) {
     char command[256];
@@ -150,6 +151,7 @@ void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp) {
     myNode->capacityInternals = 0;
 
     myNode->socket_listening = init_socket_listening(myNode->tcp_port, myNode->ip);
+    
 }
 
 int init_socket_listening(int port, char *ip) {
