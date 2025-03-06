@@ -31,7 +31,9 @@ typedef struct {
 
 void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp);
 int init_socket_listening(int port, char *ip);
-void handle_command(char *command);
+void handle_command(char *command,NodeData *myNode);
+NodeData djoin(NodeData *myNode, char *connectIP, int connectTCP);
+int connect_to_node(char *ip, int port);
 
 int main(int argc, char *argv[]) {
     char command[256];
@@ -192,32 +194,68 @@ int init_socket_listening(int port, char *ip) {
 }
 
 void handle_command(char *command, NodeData *myNode) {
-    // Aqui você pode adicionar a lógica para processar os comandos
     printf("Comando recebido: %s\n", command);
 
-    // Exemplo de comando: "help"
-    if (strcmp(command, "help\n") == 0) {
+    if (strcmp(command, "help") == 0) {
         printf("Comandos disponíveis:\n");
         printf("  help - Mostra esta mensagem de ajuda\n");
         printf("  exit - Sai do programa\n");
-        // Adicione mais comandos conforme necessário
-    } else if (strcmp(command, "exit\n") == 0) {
+    } else if (strcmp(command, "exit") == 0) {
         printf("Saindo...\n");
         exit(0);
-    } 
-    else if (strcmp(command, "djoin\n") == 0)
-    {
-        NodeData nodex= djoin(myNode); 
-    }
-    
-
-    else {
+    } else if (strncmp(command, "djoin", 5) == 0) {
+        char connectIP[16];
+        int connectTCP;
+        if (sscanf(command + 6, "%15s %d", connectIP, &connectTCP) == 2) {
+            NodeData newNode;
+            newNode = djoin(myNode, connectIP, connectTCP);
+        } else {
+            printf("Uso correto: djoin connectIP connectTCP\n");
+        }
+    } else {
         printf("Comando desconhecido: %s\n", command);
     }
 }
 
-NodeData djoin(NodeData *myNode){
+NodeData djoin(NodeData *myNode, char *connectIP, int connectTCP) {
+    NodeData updatedNode = *myNode;
+    
+    if (strcmp(connectIP, "0.0.0.0") == 0) {
+        printf("Criando rede com nó raiz (%s:%d)\n", myNode->ip, myNode->tcp_port);
+        memset(&updatedNode.external, 0, sizeof(NodeID));
+        memset(&updatedNode.safeguard, 0, sizeof(NodeID));
+        updatedNode.numInternals = 0;
+    } else {
+        int sockfd = connect_to_node(connectIP, connectTCP);
+        if (sockfd < 0) {
+            printf("Falha ao conectar a %s:%d\n", connectIP, connectTCP);
+            return updatedNode;
+        }
+        printf("Conectado a %s:%d\n", connectIP, connectTCP);
+        
+        char entry_msg[BUFFER_SIZE];
+        snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", myNode->ip, myNode->tcp_port);
+        send(sockfd, entry_msg, strlen(entry_msg), 0);
+    }
+    return updatedNode;
+}
 
+int connect_to_node(char *ip, int port) {
+    struct sockaddr_in server_addr;
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("socket");
+        return -1;
+    }
 
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &server_addr.sin_addr);
 
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("connect");
+        close(sockfd);
+        return -1;
+    }
+    return sockfd;
 }
