@@ -157,17 +157,7 @@ int main(int argc, char *argv[]) {
                 else {
                     memset(buffer, 0, BUFFER_SIZE);
                     int n = read(i, buffer, BUFFER_SIZE - 1);
-                    // printf("{%d}",i);
-                    // When receiving any data, before processing:
-                    // printf("Raw data received (%d bytes): '", n);
-                    // for (int j = 0; j < n; j++) {
-                    //     if (isprint(buffer[j]))
-                    //         printf("%c", buffer[j]);
-                    //     else
-                    //         printf("\\x%02x", (unsigned char)buffer[j]);
-                    // }
-                    // printf("'\n");
-                    // printf("Buffer recebido: '%s' (tamanho: %d)\n", buffer, (int)strlen(buffer));
+                    
                     if (n <= 0) {
                         if (n == 0) {
                             printf("Conexão fechada no FD %d\n", i);
@@ -183,41 +173,72 @@ int main(int argc, char *argv[]) {
                         printf("Recebido do FD %d: %s", i, buffer);
                         
                         // Processamento das mensagens do protocolo
-                        if (strncmp(buffer, "ENTRY", 5) == 0) {
-                            printf("recebi uma mensagem de entry lol\n");
-                            // Processar mensagem ENTRY
-                            char ip[16];
-                            int tcp_port;
+                       if (strncmp(buffer, "ENTRY", 5) == 0) {
+    printf("recebi uma mensagem de entry lol\n");
+    // Processar mensagem ENTRY
+    char ip[16];
+    int tcp_port;
+    
+    if (sscanf(buffer + 6, "%15s %d", ip, &tcp_port) == 2) {
+        NodeID new_node;
+        strncpy(new_node.ip, ip, sizeof(new_node.ip) - 1);
+        new_node.ip[sizeof(new_node.ip) - 1] = '\0';
+        new_node.tcp_port = tcp_port;
+        new_node.socket_fd = i;
+        
+        // Verificar se o nó atual tem vizinho externo, caso n tenha deve enviar ENTRY e SAFE
+        if (my_node.vzext.tcp_port == -1) {
+            // Se não tiver vizinho externo, o nó que está se juntando se torna o vizinho externo
+            strncpy(my_node.vzext.ip, new_node.ip, sizeof(my_node.vzext.ip) - 1);
+            my_node.vzext.ip[sizeof(my_node.vzext.ip) - 1] = '\0';
+            my_node.vzext.tcp_port = new_node.tcp_port;
+            my_node.vzext.socket_fd = i;
+            
+            printf("Novo vizinho externo definido: %s:%d\n", my_node.vzext.ip, my_node.vzext.tcp_port);
+            printf("Adicionar vizinho interno %s --> %d\n",ip,tcp_port);
+            add_internal_neighbor(&my_node, new_node);
 
-                            if (sscanf(buffer + 6, "%15s %d", ip, &tcp_port) == 2) {
-                                NodeID new_node;
-                                strncpy(new_node.ip, ip, sizeof(new_node.ip) - 1);
-                                new_node.ip[sizeof(new_node.ip) - 1] = '\0';
-                                new_node.tcp_port = tcp_port;
-                                new_node.socket_fd = i;
-                                
-                                // Se não for igual ao vizinho externo
-                                if (strcmp(my_node.vzext.ip, new_node.ip) != 0 || 
-                                    my_node.vzext.tcp_port != new_node.tcp_port) {
-                                    
-                                    // Adicionar como vizinho interno
-                                    add_internal_neighbor(&my_node, new_node);
-                                    
-                                    // Enviar mensagem SAFE com o vizinho externo
-                                    char safe_msg[BUFFER_SIZE];
-                                    snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
-                                            my_node.vzext.ip, my_node.vzext.tcp_port);
+            // Enviar mensagem SAFE com o próprio nó como salvaguarda
+            char safe_msg[BUFFER_SIZE];
+            snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
+                     my_node.vzext.ip, my_node.vzext.tcp_port);
+                     
+            if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
+                perror("send SAFE");
+            }
+            printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
+            //envia mensagem de ENTRY
+            char entry_msg[BUFFER_SIZE];
+            snprintf(entry_msg,sizeof(entry_msg),"ENTRY %s %d\n", my_node.ip,my_node.tcp_port);
 
-                                    
-                                    if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
-                                        perror("send SAFE");
-                                    }
-                                    
-                                    printf("\t\tMensagem enviada para fd: %d ---> %s ",i,safe_msg);
-                                }
-                            }
-                        }
-                        
+            if (send(i,entry_msg,sizeof(entry_msg),0) < 0)
+            {
+                perror("send ENTRY");
+            }
+            printf("\t\tMensagem enviada para fd: %d ---> %s", i, entry_msg);
+            
+        }
+        
+            // Adicionar como vizinho interno
+            printf("Adicionar vizinho interno %s --> %d\n",ip,tcp_port);
+            add_internal_neighbor(&my_node, new_node);
+            
+            // Enviar mensagem SAFE com o vizinho externo
+            char safe_msg[BUFFER_SIZE];
+            snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
+                     my_node.vzext.ip, my_node.vzext.tcp_port);
+                     
+            if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
+                perror("send SAFE");
+            }
+            
+            printf("\t\tMensagem enviada para fd: %d ---> %s ", i, safe_msg);
+
+           
+            
+        
+    }
+}
                           else if (strncmp(buffer, "SAFE", 4) == 0) {
                             // Processar mensagem SAFE
                              printf("\t\tMensagem de safe a ser processada\n");
@@ -232,20 +253,8 @@ int main(int argc, char *argv[]) {
                                       my_node.vzsalv.ip, my_node.vzsalv.tcp_port);
                             }
                             
-                            //Segunda mensagem de safe
-                            if (i == my_node.vzext.socket_fd && my_node.vzext.safe_sent == 0) {
-                                // Enviar SAFE de volta com nosso nó de salvaguarda (próprio nó)
-                                char safe_msg[BUFFER_SIZE];
-                                snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
-                                        my_node.ip, my_node.tcp_port);
-                                        
-                                if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
-                                    perror("send SAFE response");
-                                } else {
-                                    printf("\t\tMensagem SAFE de resposta enviada para fd: %d ---> %s", i, safe_msg);
-                                    my_node.vzext.safe_sent = 1; // Marcar que já enviamos SAFE para evitar loops
-                                }
-                            }
+                            
+                            
 
                         }
                     }
@@ -259,12 +268,14 @@ int main(int argc, char *argv[]) {
 
 void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp) {
     // Inicializar o nó com seu próprio ID como vizinho externo (inicialmente)
-    strncpy(myNode->vzext.ip, myNode->ip, sizeof(myNode->vzext.ip));
-    myNode->vzext.tcp_port = myNode->tcp_port;
-    myNode->vzext.socket_fd = -1;  // Não há conexão ainda
+    
+    memset(&myNode->vzext,0,sizeof(NodeID));
+    myNode->vzext.tcp_port=-1;
+    myNode->vzext.socket_fd=-1;
     myNode->vzext.safe_sent=0;
     // Inicializar vizinho de salvaguarda como não definido
     memset(&myNode->vzsalv, 0, sizeof(NodeID));
+    myNode->vzsalv.tcp_port=-1;
     myNode->vzsalv.socket_fd = -1;
     myNode->vzsalv.safe_sent=0;
     // Inicializar lista de vizinhos internos
