@@ -4,7 +4,7 @@ Comando a testar ./ndn 100 192.168.1.175 5000 193.136.138.142 59000
 
 Cenas a fazer:
 		
-	Ver a cena das sockets q a stora disse em aula
+	CHECK --- Ver a cena das sockets q a stora disse em aula
 	Ver ENTRY e SAFE
 	Deixar de usar o realloc
 	Lógica do djoin

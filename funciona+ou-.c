@@ -8,6 +8,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/time.h>  
+#include <ctype.h>
+
 
 #define BUFFER_SIZE 128
 
@@ -15,6 +17,7 @@ typedef struct NodeID {
     char ip[16];
     int tcp_port;
     int socket_fd;  // Socket de conexão com este nó
+    int safe_sent;
 } NodeID;
 
 typedef struct {
@@ -35,10 +38,10 @@ typedef struct {
 
 void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp);
 int init_socket_listening(int port, char *ip);
-void handle_command(char *command, NodeData *myNode);
+int handle_command(char *command, NodeData *myNode);
 int djoin(NodeData *myNode, char *connectIP, int connectTCP);
 int connect_to_node(char *ip, int port);
-void handle_entry_response(NodeData *myNode, char *buffer);
+// void handle_entry_response(NodeData *myNode, char *buffer);
 void add_internal_neighbor(NodeData *myNode, NodeID neighbor);
 void show_topology(NodeData *myNode);
 
@@ -82,8 +85,8 @@ int main(int argc, char *argv[]) {
     fd_set master_fds, read_fds;
     FD_ZERO(&master_fds);
     FD_SET(STDIN_FILENO, &master_fds);         // Adicionar stdin para comandos de usuário
-    FD_SET(my_node.socket_listening, &master_fds);
-    int max_fd = my_node.socket_listening;
+    FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
+    int max_fd = my_node.socket_listening; 
 
     // Adicionar sockets de conexão existentes ao master_fds
     if (my_node.vzext.socket_fd > 0) {
@@ -98,7 +101,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    char command[256];
+    char command[BUFFER_SIZE];
     
     while (1) {
         read_fds = master_fds;
@@ -114,12 +117,25 @@ int main(int argc, char *argv[]) {
         
         // Verificar todas as conexões para atividade
         for (int i = 0; i <= max_fd; i++) {
+            // printf("\t\t\t\t\t\t\t\t\t[%d]\n",i);
             if (FD_ISSET(i, &read_fds)) {
                 // Entrada do usuário no terminal
                 if (i == STDIN_FILENO) {
                     if (fgets(command, sizeof(command), stdin) != NULL) {
                         command[strcspn(command, "\n")] = '\0';  // Remover \n
-                        handle_command(command, &my_node);
+                        int fd = handle_command(command, &my_node);
+                        // printf("O VALOR DE FD É %d\n",fd);
+                        if (fd!=0)
+                        {
+                            FD_SET(fd,&master_fds);
+                            if (max_fd<fd)
+                            {
+                                max_fd=fd;
+                            }
+                            
+                        }
+                        
+                        // printf("[[[Estou aqui\n linha 123]]]\n");
                     }
                 }
                 // Nova conexão no socket de escuta
@@ -136,11 +152,22 @@ int main(int argc, char *argv[]) {
                         printf("Nova conexão aceita: FD %d\n", new_fd);
                     }
                 }
+                
                 // Dados recebidos de uma conexão existente
                 else {
                     memset(buffer, 0, BUFFER_SIZE);
                     int n = read(i, buffer, BUFFER_SIZE - 1);
-                    
+                    // printf("{%d}",i);
+                    // When receiving any data, before processing:
+                    // printf("Raw data received (%d bytes): '", n);
+                    // for (int j = 0; j < n; j++) {
+                    //     if (isprint(buffer[j]))
+                    //         printf("%c", buffer[j]);
+                    //     else
+                    //         printf("\\x%02x", (unsigned char)buffer[j]);
+                    // }
+                    // printf("'\n");
+                    // printf("Buffer recebido: '%s' (tamanho: %d)\n", buffer, (int)strlen(buffer));
                     if (n <= 0) {
                         if (n == 0) {
                             printf("Conexão fechada no FD %d\n", i);
@@ -156,11 +183,12 @@ int main(int argc, char *argv[]) {
                         printf("Recebido do FD %d: %s", i, buffer);
                         
                         // Processamento das mensagens do protocolo
-                        if (strncmp(buffer, "ENTRY\n", 5) == 0) {
+                        if (strncmp(buffer, "ENTRY", 5) == 0) {
                             printf("recebi uma mensagem de entry lol\n");
                             // Processar mensagem ENTRY
                             char ip[16];
                             int tcp_port;
+
                             if (sscanf(buffer + 6, "%15s %d", ip, &tcp_port) == 2) {
                                 NodeID new_node;
                                 strncpy(new_node.ip, ip, sizeof(new_node.ip) - 1);
@@ -179,12 +207,20 @@ int main(int argc, char *argv[]) {
                                     char safe_msg[BUFFER_SIZE];
                                     snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
                                             my_node.vzext.ip, my_node.vzext.tcp_port);
-                                    send(i, safe_msg, strlen(safe_msg), 0);
+
+                                    
+                                    if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
+                                        perror("send SAFE");
+                                    }
+                                    
+                                    printf("\t\tMensagem enviada para fd: %d ---> %s ",i,safe_msg);
                                 }
                             }
-                        } else if (strncmp(buffer, "SAFE\n", 4) == 0) {
+                        }
+                        
+                          else if (strncmp(buffer, "SAFE", 4) == 0) {
                             // Processar mensagem SAFE
-                            // printf("Mensagem de safe a ser processada\n");
+                             printf("\t\tMensagem de safe a ser processada\n");
                             char ip[16];
                             int tcp_port;
                             if (sscanf(buffer + 5, "%15s %d", ip, &tcp_port) == 2) {
@@ -195,6 +231,22 @@ int main(int argc, char *argv[]) {
                                 printf("Nó de salvaguarda atualizado: %s:%d\n", 
                                       my_node.vzsalv.ip, my_node.vzsalv.tcp_port);
                             }
+                            
+                            //Segunda mensagem de safe
+                            if (i == my_node.vzext.socket_fd && my_node.vzext.safe_sent == 0) {
+                                // Enviar SAFE de volta com nosso nó de salvaguarda (próprio nó)
+                                char safe_msg[BUFFER_SIZE];
+                                snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
+                                        my_node.ip, my_node.tcp_port);
+                                        
+                                if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
+                                    perror("send SAFE response");
+                                } else {
+                                    printf("\t\tMensagem SAFE de resposta enviada para fd: %d ---> %s", i, safe_msg);
+                                    my_node.vzext.safe_sent = 1; // Marcar que já enviamos SAFE para evitar loops
+                                }
+                            }
+
                         }
                     }
                 }
@@ -210,11 +262,11 @@ void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp) {
     strncpy(myNode->vzext.ip, myNode->ip, sizeof(myNode->vzext.ip));
     myNode->vzext.tcp_port = myNode->tcp_port;
     myNode->vzext.socket_fd = -1;  // Não há conexão ainda
-    
+    myNode->vzext.safe_sent=0;
     // Inicializar vizinho de salvaguarda como não definido
     memset(&myNode->vzsalv, 0, sizeof(NodeID));
     myNode->vzsalv.socket_fd = -1;
-    
+    myNode->vzsalv.safe_sent=0;
     // Inicializar lista de vizinhos internos
     myNode->intr = malloc(10 * sizeof(NodeID));  // Capacidade inicial
     myNode->numInternals = 0;
@@ -278,8 +330,8 @@ int init_socket_listening(int port, char *ip) {
     return fd;
 }
 
-void handle_command(char *command, NodeData *myNode) {
-    printf("Comando recebido: %s\n", command);
+int handle_command(char *command, NodeData *myNode) {
+    // printf("Comando recebido: %s\n", command);
 
     char cmd[20];
     char arg1[100], arg2[100];
@@ -312,12 +364,14 @@ void handle_command(char *command, NodeData *myNode) {
             } else {
                 printf("Conectando ao nó %s:%s...\n", arg1, arg2);
                 djoin(myNode, arg1, atoi(arg2));
+                return 1;
             }
         }
     }
     else if ((strcmp(cmd, "dj") == 0 || strcmp(cmd, "direct_join") == 0) && args >= 3) {
         printf("Conectando ao nó %s:%s...\n", arg1, arg2);
-        djoin(myNode, arg1, atoi(arg2));
+        int fd = djoin(myNode, arg1, atoi(arg2));
+        return fd;
     }
     else if (strcmp(cmd, "show") == 0 && args >= 2) {
         if (strcmp(arg1, "topology") == 0 || strcmp(arg1, "st") == 0) {
@@ -330,6 +384,7 @@ void handle_command(char *command, NodeData *myNode) {
     else {
         printf("Comando desconhecido: %s\n", command);
     }
+    return 0;
 }
 
 int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
@@ -364,6 +419,7 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
         myNode->vzext.ip[sizeof(myNode->vzext.ip) - 1] = '\0';
         myNode->vzext.tcp_port = connectTCP;
         myNode->vzext.socket_fd = sockfd;
+        myNode->vzext.safe_sent = 0;
         
         // Enviar mensagem ENTRY
         char entry_msg[BUFFER_SIZE];
@@ -374,10 +430,11 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
             return -1;
         }
         
-        printf("Mensagem ENTRY enviada, aguardando resposta SAFE...\n");
+        printf("\t\tMensagem enviada para o fd:%d ---> %s",sockfd,entry_msg);
+        printf("\t\tAguardando msg de SAFE . . . \n");
         
         // A resposta SAFE será tratada no loop principal que lê as mensagens recebidas
-        return 0;
+        return sockfd;
     }
 }
 
@@ -417,7 +474,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
             return;
         }
     }
-    
+    neighbor.safe_sent=0;
     // Verificar se precisamos expandir o array
     if (myNode->numInternals >= myNode->capacityInternals) {
         myNode->capacityInternals *= 2;
