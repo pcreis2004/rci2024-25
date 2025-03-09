@@ -1,6 +1,7 @@
 Ip do thinkpad 192.168.1.175
 Comando a testar ./ndn 100 192.168.1.175 5000 193.136.138.142 59000
 
+Servidor de Nós: 193.136.138.142 59000
 
 Cenas a fazer:
 		

@@ -9,7 +9,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>  
 #include <ctype.h>
-
+#include <time.h>
 
 #define BUFFER_SIZE 128
 
@@ -38,8 +38,9 @@ typedef struct {
 
 void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp);
 int init_socket_listening(int port, char *ip);
-int handle_command(char *command, NodeData *myNode);
+int handle_command(char *command, NodeData *myNode, char *ip, int port);
 int djoin(NodeData *myNode, char *connectIP, int connectTCP);
+int join(char *net,char *ip, int port,NodeData *myNode);
 int connect_to_node(char *ip, int port);
 // void handle_entry_response(NodeData *myNode, char *buffer);
 void add_internal_neighbor(NodeData *myNode, NodeID neighbor);
@@ -122,7 +123,7 @@ int main(int argc, char *argv[]) {
             if (i == STDIN_FILENO) {
                 if (fgets(command, sizeof(command), stdin) != NULL) {
                     command[strcspn(command, "\n")] = '\0';  // Remover \n
-                    int fd = handle_command(command, &my_node);
+                    int fd = handle_command(command, &my_node, reg_server_ip, reg_server_port);
                     if (fd != 0) {
                         FD_SET(fd, &master_fds);
                         if (max_fd < fd) {
@@ -334,7 +335,7 @@ int init_socket_listening(int port, char *ip) {
     return fd;
 }
 
-int handle_command(char *command, NodeData *myNode) {
+int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     // printf("Comando recebido: %s\n", command);
 
     char cmd[20];
@@ -382,6 +383,12 @@ int handle_command(char *command, NodeData *myNode) {
             show_topology(myNode);
         }
     }
+    else if (strcmp(cmd,"j")==0)
+    {
+        int fd = join(arg1,ip,port,myNode);
+        return fd;
+    }
+    
     else if (strcmp(cmd, "st") == 0) {
         show_topology(myNode);
     }
@@ -389,6 +396,144 @@ int handle_command(char *command, NodeData *myNode) {
         printf("Comando desconhecido: %s\n", command);
     }
     return 0;
+}
+
+// int join(char *net,char *ip, int port){
+//     //conectar ao servidor
+//     struct addrinfo hints,*res;
+//     socklen_t addrlen;
+//     struct sockaddr addr;
+//     int fd,errcode;
+//     ssize_t n;
+//     fd=socket(AF_INET,SOCK_DGRAM,0);//UDP socket
+//     if(fd==-1)/*error*/exit(1);
+//     memset(&hints,0,sizeof hints);
+//     hints.ai_family=AF_INET;//IPv4
+//     hints.ai_socktype=SOCK_DGRAM;//UDP socket
+
+//     char buffer[128+1];
+//     // char buffer[16];
+
+//     sprintf(buffer,"%d",port);
+
+
+//     errcode=getaddrinfo(ip,buffer,&hints,&res);
+
+//     char mensagem[20];
+
+//     snprintf(mensagem, sizeof(mensagem), "NODES %s\n", net);
+
+//     n = sendto(fd, mensagem, strlen(mensagem), 0, res->ai_addr, res->ai_addrlen);
+
+
+//     if(n==-1)/*error*/exit(1);
+
+//     addrlen=sizeof(addr);
+//     n=recvfrom(fd,buffer,128,0,&addr,&addrlen);
+//     buffer[n] = '\0';
+//     printf("%s\n", buffer);
+
+
+
+
+//     close(fd);
+
+// }
+
+
+int join(char *net, char *ip, int port,NodeData *myNode) {
+    // conectar ao servidor
+    struct addrinfo hints, *res;
+    socklen_t addrlen;
+    struct sockaddr addr;
+    int fd, errcode;
+    ssize_t n;
+    
+    fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
+    if (fd == -1) /*error*/ exit(1);
+    
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET; // IPv4
+    hints.ai_socktype = SOCK_DGRAM; // UDP socket
+    
+    char buffer[1024]; // Increased buffer size to handle multiple lines
+    sprintf(buffer, "%d", port);
+    
+    errcode = getaddrinfo(ip, buffer, &hints, &res);
+    if (errcode != 0) return -1;
+    
+    char mensagem[20];
+    snprintf(mensagem, sizeof(mensagem), "NODES %s\n", net);
+    
+    n = sendto(fd, mensagem, strlen(mensagem), 0, res->ai_addr, res->ai_addrlen);
+    if (n == -1) /*error*/ exit(1);
+    
+    addrlen = sizeof(addr);
+    n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
+    if (n == -1) return -1;
+    
+    buffer[n] = '\0';
+    printf("%s\n", buffer);
+    
+    // Parse the response to get IP addresses and ports
+    char *line = strtok(buffer, "\n");
+    
+    // Skip first line (NODESLIST 100)
+    if (line != NULL) {
+        line = strtok(NULL, "\n");
+    }
+    
+    // Count how many servers we have
+    int server_count = 0;
+    char *servers[100]; // Assuming maximum 100 servers
+    
+    while (line != NULL && server_count < 100) {
+        servers[server_count++] = line;
+        line = strtok(NULL, "\n");
+    }
+    printf("ESTOU AQUI\n");
+    // If no servers available, return error
+    if (server_count == 0) {
+        char msgServer[BUFFER_SIZE];
+        snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
+        printf("A mensagem enviada foi %s", msgServer);
+        n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
+        printf("Nó registado no servidor\n");
+        if(n == -1) /*error*/ exit(1);
+    // Store the selected IP and port in variables
+    // (You might want to modify the function parameters to pass these back)
+    // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
+        close(fd);
+        return 0;
+    }
+    
+    // Choose a random server
+    srand(time(NULL));
+    int random_index = rand() % server_count;
+    char selected_server[128];
+    strcpy(selected_server, servers[random_index]);
+    
+    // Extract IP and port from the selected server
+    char selected_ip[64];
+    int selected_port;
+    sscanf(selected_server, "%s %d", selected_ip, &selected_port);
+    
+    printf("Randomly selected server: %s:%d\n", selected_ip, selected_port);
+
+
+    int filed = djoin(myNode,selected_ip,selected_port);
+
+    char msgServer[BUFFER_SIZE];
+    snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
+    n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
+    printf("Nó registado no servidor\n");
+    if (n == -1) /*error*/ exit(1);
+    // Store the selected IP and port in variables
+    // (You might want to modify the function parameters to pass these back)
+    // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
+    
+    close(fd);
+    return filed;
 }
 
 int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
