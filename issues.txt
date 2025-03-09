@@ -5,18 +5,21 @@ Comando a testar ./ndn 100 192.168.1.175 5000 193.136.138.142 59000
 Cenas a fazer:
 		
 	CHECK --- Ver a cena das sockets q a stora disse em aula
-	Ver ENTRY e SAFE
-	Deixar de usar o realloc
-	Lógica do djoin
+	CHECK --- Ver ENTRY e SAFE
+	Deixar de usar o realloc --- Talvez nem seja necessário
+	CHECK --- Lógica do djoin
 
 	Ver a cena do servidor UDP para o Join
 	Fazer o comando join
 
 Issues:
-	Arranjar maneira de arranjar a mensagem extra de SAFE que está a ser enviada
-
+	Será que a cena do usleep é a melhor alternative???
 Resolvido:
+
+	Arranjar maneira de arranjar a mensagem extra de SAFE que está a ser enviada
+	
 	o servidor não é tão rápido como o da aula
+
 
 	getaddrinfo(NULL,port_str,&hints,&res) --- Assim funciona
 	getaddrinfo( IP do thinkpad em formato str ,port_str,&hints,&res) --- Não devia ser assim???
