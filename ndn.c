@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
                     
                     // Processamento das mensagens do protocolo
                     if (strncmp(buffer, "ENTRY", 5) == 0) {
-                        printf("recebi uma mensagem de entry lol\n");
+                        // printf("recebi uma mensagem de entry lol\n");
                         // Processar mensagem ENTRY
                         char ip[16];
                         int tcp_port;
@@ -187,10 +187,10 @@ int main(int argc, char *argv[]) {
                                 my_node.vzext.tcp_port = new_node.tcp_port;
                                 my_node.vzext.socket_fd = i;
                                 
-                                printf("Novo vizinho externo definido: %s:%d\n", my_node.vzext.ip, my_node.vzext.tcp_port);
+                                // printf("Novo vizinho externo definido: %s:%d\n", my_node.vzext.ip, my_node.vzext.tcp_port);
                                 
                                 // Adicionar como vizinho interno
-                                printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
+                                // printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
                                 add_internal_neighbor(&my_node, new_node);
                                 
                                 // Primeiro, enviar mensagem SAFE
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
                                 if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
                                     perror("send SAFE");
                                 } else {
-                                    printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
+                                    // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
                                 }
                                 
                                 // Introduzir um pequeno atraso para garantir que as mensagens sejam processadas separadamente
@@ -215,13 +215,13 @@ int main(int argc, char *argv[]) {
                                 if (send(i, entry_msg, strlen(entry_msg), 0) < 0) {
                                     perror("send ENTRY");
                                 } else {
-                                    printf("\t\tMensagem enviada para fd: %d ---> %s", i, entry_msg);
+                                    // printf("\t\tMensagem enviada para fd: %d ---> %s", i, entry_msg);
                                 }
                             } else {
                                 // Adicionar como vizinho interno apenas se não for o vizinho externo
                                 
                                     
-                                    printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
+                                    // printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
                                     add_internal_neighbor(&my_node, new_node);
                                     
                                     // Enviar mensagem SAFE com o vizinho externo
@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
                                     if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
                                         perror("send SAFE");
                                     } else {
-                                        printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
+                                        // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
                                     }
                                 
                             }
@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
                     }
                     else if (strncmp(buffer, "SAFE", 4) == 0) {
                         // Processar mensagem SAFE
-                        printf("\t\tMensagem de safe a ser processada\n");
+                        // printf("\t\tMensagem de safe a ser processada\n");
                         char ip[16];
                         int tcp_port;
                         if (sscanf(buffer + 5, "%15s %d", ip, &tcp_port) == 2) {
@@ -248,8 +248,8 @@ int main(int argc, char *argv[]) {
                             strncpy(my_node.vzsalv.ip, ip, sizeof(my_node.vzsalv.ip) - 1);
                             my_node.vzsalv.ip[sizeof(my_node.vzsalv.ip) - 1] = '\0';
                             my_node.vzsalv.tcp_port = tcp_port;
-                            printf("Nó de salvaguarda atualizado: %s:%d\n", 
-                                   my_node.vzsalv.ip, my_node.vzsalv.tcp_port);
+                            // printf("Nó de salvaguarda atualizado: %s:%d\n", 
+                                //    my_node.vzsalv.ip, my_node.vzsalv.tcp_port);
                         }
                     }
                 }
@@ -374,7 +374,7 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
         }
     }
     else if ((strcmp(cmd, "dj") == 0 || strcmp(cmd, "direct_join") == 0) && args >= 3) {
-        printf("Conectando ao nó %s:%s...\n", arg1, arg2);
+        // printf("Conectando ao nó %s:%s...\n", arg1, arg2);
         int fd = djoin(myNode, arg1, atoi(arg2));
         return fd;
     }
@@ -397,49 +397,6 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     }
     return 0;
 }
-
-// int join(char *net,char *ip, int port){
-//     //conectar ao servidor
-//     struct addrinfo hints,*res;
-//     socklen_t addrlen;
-//     struct sockaddr addr;
-//     int fd,errcode;
-//     ssize_t n;
-//     fd=socket(AF_INET,SOCK_DGRAM,0);//UDP socket
-//     if(fd==-1)/*error*/exit(1);
-//     memset(&hints,0,sizeof hints);
-//     hints.ai_family=AF_INET;//IPv4
-//     hints.ai_socktype=SOCK_DGRAM;//UDP socket
-
-//     char buffer[128+1];
-//     // char buffer[16];
-
-//     sprintf(buffer,"%d",port);
-
-
-//     errcode=getaddrinfo(ip,buffer,&hints,&res);
-
-//     char mensagem[20];
-
-//     snprintf(mensagem, sizeof(mensagem), "NODES %s\n", net);
-
-//     n = sendto(fd, mensagem, strlen(mensagem), 0, res->ai_addr, res->ai_addrlen);
-
-
-//     if(n==-1)/*error*/exit(1);
-
-//     addrlen=sizeof(addr);
-//     n=recvfrom(fd,buffer,128,0,&addr,&addrlen);
-//     buffer[n] = '\0';
-//     printf("%s\n", buffer);
-
-
-
-
-//     close(fd);
-
-// }
-
 
 int join(char *net, char *ip, int port,NodeData *myNode) {
     // conectar ao servidor
@@ -473,7 +430,7 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     if (n == -1) return -1;
     
     buffer[n] = '\0';
-    printf("%s\n", buffer);
+    printf("> Nó connectado à net %s\n", net);
     
     // Parse the response to get IP addresses and ports
     char *line = strtok(buffer, "\n");
@@ -491,18 +448,17 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
         servers[server_count++] = line;
         line = strtok(NULL, "\n");
     }
-    printf("ESTOU AQUI\n");
     // If no servers available, return error
     if (server_count == 0) {
         char msgServer[BUFFER_SIZE];
         snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
-        printf("A mensagem enviada foi %s", msgServer);
+        // printf("A mensagem enviada foi %s", msgServer);
         n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
-        printf("Nó registado no servidor\n");
+        // printf("Nó registado no servidor\n");
         if(n == -1) /*error*/ exit(1);
-    // Store the selected IP and port in variables
-    // (You might want to modify the function parameters to pass these back)
-    // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
+        // Store the selected IP and port in variables
+        // (You might want to modify the function parameters to pass these back)
+        // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
         close(fd);
         return 0;
     }
@@ -518,7 +474,7 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     int selected_port;
     sscanf(selected_server, "%s %d", selected_ip, &selected_port);
     
-    printf("Randomly selected server: %s:%d\n", selected_ip, selected_port);
+    // printf("Randomly selected server: %s:%d\n", selected_ip, selected_port);
 
 
     int filed = djoin(myNode,selected_ip,selected_port);
@@ -526,12 +482,15 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     char msgServer[BUFFER_SIZE];
     snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
     n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
-    printf("Nó registado no servidor\n");
+    // printf("Nó registado no servidor\n");
     if (n == -1) /*error*/ exit(1);
+    printf("> Nó registado na net %s\n", net);
+
     // Store the selected IP and port in variables
     // (You might want to modify the function parameters to pass these back)
     // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
-    
+    freeaddrinfo(res);
+
     close(fd);
     return filed;
 }
@@ -579,40 +538,56 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
             return -1;
         }
         
-        printf("\t\tMensagem enviada para o fd:%d ---> %s",sockfd,entry_msg);
-        printf("\t\tAguardando msg de SAFE . . . \n");
+        // printf("\t\tMensagem enviada para o fd:%d ---> %s",sockfd,entry_msg);
+        // printf("\t\tAguardando msg de SAFE . . . \n");
         
         // A resposta SAFE será tratada no loop principal que lê as mensagens recebidas
         return sockfd;
     }
 }
 
+
 int connect_to_node(char *ip, int port) {
-    struct sockaddr_in server_addr;
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    struct addrinfo hints, *res;
+    int sockfd, errcode;
+    char port_str[6]; // Enough for a 5-digit port number plus null terminator
+    
+    // Convert port integer to string
+    snprintf(port_str, sizeof(port_str), "%d", port);
+    
+    // Initialize hints structure
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;      // IPv4
+    hints.ai_socktype = SOCK_STREAM; // TCP stream sockets
+    
+    // Get address information
+    if ((errcode = getaddrinfo(ip, port_str, &hints, &res)) != 0) {
+        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(errcode));
+        return -1;
+    }
+    
+    // Create socket
+    sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sockfd < 0) {
         perror("socket");
+        freeaddrinfo(res);
         return -1;
     }
-
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
     
-    if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
-        perror("inet_pton");
-        close(sockfd);
-        return -1;
-    }
-
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    // Connect to the server
+    if (connect(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
         perror("connect");
         close(sockfd);
+        freeaddrinfo(res);
         return -1;
     }
+    
+    // Free the address info structure
+    freeaddrinfo(res);
     
     return sockfd;
 }
+
 
 void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
     // Verificar se já temos esse vizinho
@@ -638,7 +613,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
     myNode->intr[myNode->numInternals] = neighbor;
     myNode->numInternals++;
     
-    printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
+    // printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
 }
 
 void show_topology(NodeData *myNode) {
