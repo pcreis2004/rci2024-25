@@ -10,11 +10,11 @@ Cenas a fazer:
 	Deixar de usar o realloc --- Talvez nem seja necessário
 	CHECK --- Lógica do djoin
 
-	Ver a cena do servidor UDP para o Join
-	Fazer o comando join
+	CHECK --- Ver a cena do servidor UDP para o Join
+	CHECK --- Fazer o comando join
 
 Issues:
-	Será que a cena do usleep é a melhor alternative???
+	Será que a cena do usleep é a melhor alternative??? Se calhar perguntas à prof
 Resolvido:
 
 	Arranjar maneira de arranjar a mensagem extra de SAFE que está a ser enviada

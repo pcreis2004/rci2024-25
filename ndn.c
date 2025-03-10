@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
 
     init_node(&my_node, cache_size, reg_server_ip, reg_server_port);
 
-    printf("NDN Node started. Enter commands:\n");
+    printf("NDN Node started. Enter commands:\n\n");
 
     fd_set master_fds, read_fds;
     FD_ZERO(&master_fds);
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
                 } else {
                     FD_SET(new_fd, &master_fds);
                     if (new_fd > max_fd) max_fd = new_fd;
-                    printf("Nova conexão aceita: FD %d\n", new_fd);
+                    printf("Nova conexão aceita: FD %d\n\n", new_fd);
                 }
             }
             
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
                     FD_CLR(i, &master_fds);
                 } else {
                     buffer[n] = '\0';  // Garantir terminação da string
-                    printf("Recebido do FD %d: %s", i, buffer);
+                    printf("Recebido do FD %d: %s\n", i, buffer);
                     
                     // Processamento das mensagens do protocolo
                     if (strncmp(buffer, "ENTRY", 5) == 0) {
@@ -430,7 +430,7 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     if (n == -1) return -1;
     
     buffer[n] = '\0';
-    printf("> Nó connectado à net %s\n", net);
+    printf("\tNó connectado à net %s\n\n", net);
     
     // Parse the response to get IP addresses and ports
     char *line = strtok(buffer, "\n");
@@ -484,7 +484,7 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
     // printf("Nó registado no servidor\n");
     if (n == -1) /*error*/ exit(1);
-    printf("> Nó registado na net %s\n", net);
+    printf("\n\tNó registado na net %s\n\n", net);
 
     // Store the selected IP and port in variables
     // (You might want to modify the function parameters to pass these back)
@@ -520,7 +520,7 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
             return -1;
         }
         
-        printf("Conectado a %s:%d (socket: %d)\n", connectIP, connectTCP, sockfd);
+        // printf("Conectado a %s:%d (socket: %d)\n", connectIP, connectTCP, sockfd);
         
         // Atualizar vizinho externo
         strncpy(myNode->vzext.ip, connectIP, sizeof(myNode->vzext.ip) - 1);
@@ -538,7 +538,7 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
             return -1;
         }
         
-        // printf("\t\tMensagem enviada para o fd:%d ---> %s",sockfd,entry_msg);
+        printf("\n\tLigado na Socket:%d ao nó %s %d\n\n",sockfd,connectIP,connectTCP);
         // printf("\t\tAguardando msg de SAFE . . . \n");
         
         // A resposta SAFE será tratada no loop principal que lê as mensagens recebidas
