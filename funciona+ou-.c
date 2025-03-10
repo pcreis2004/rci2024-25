@@ -21,6 +21,7 @@ typedef struct NodeID {
 } NodeID;
 
 typedef struct {
+    int flaginit;
     char ip[16];           // IP do nó atual
     int tcp_port;          // Porto TCP do nó atual
     int socket_listening;  // Socket de escuta para conexões entrantes
@@ -39,7 +40,7 @@ typedef struct {
 void init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp);
 int init_socket_listening(int port, char *ip);
 int handle_command(char *command, NodeData *myNode, char *ip, int port);
-int djoin(NodeData *myNode, char *connectIP, int connectTCP);
+int djoin(NodeData *myNode, char *connectIP, int connectTCP,int cache_size);
 int join(char *net,char *ip, int port,NodeData *myNode);
 int connect_to_node(char *ip, int port);
 // void handle_entry_response(NodeData *myNode, char *buffer);
@@ -405,7 +406,7 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     } 
     else if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "x") == 0) {
         printf("Saindo...\n");
-        free_node_memory(myNode);
+        // free_node_memory(myNode);
         exit(0);
     } 
     else if (strcmp(cmd, "direct") == 0 && args >= 3) {
@@ -415,14 +416,14 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
                 printf("Uso correto: direct join conIP conTCP\n");
             } else {
                 printf("Conectando ao nó %s:%s...\n", arg1, arg2);
-                djoin(myNode, arg1, atoi(arg2));
+                djoin(myNode, arg1, atoi(arg2),myNode->cacheSize);
                 return 1;
             }
         }
     }
     else if ((strcmp(cmd, "dj") == 0 || strcmp(cmd, "direct_join") == 0) && args >= 3) {
         // printf("Conectando ao nó %s:%s...\n", arg1, arg2);
-        int fd = djoin(myNode, arg1, atoi(arg2));
+        int fd = djoin(myNode, arg1, atoi(arg2),myNode->cacheSize);
         return fd;
     }
     else if (strcmp(cmd, "show") == 0 && args >= 2) {
@@ -503,6 +504,16 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
         n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
         // printf("Nó registado no servidor\n");
         if(n == -1) /*error*/ exit(1);
+
+        n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
+
+        buffer[n]='\0';
+    if (strcmp(buffer,"OKREG")==0)
+    {
+        printf("»»%s\n",buffer);
+    }else{
+        printf("Fora daquele nó estranho %s\n",buffer);
+    }
         // Store the selected IP and port in variables
         // (You might want to modify the function parameters to pass these back)
         // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
@@ -524,8 +535,16 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     // printf("Randomly selected server: %s:%d\n", selected_ip, selected_port);
 
 
-    int filed = djoin(myNode,selected_ip,selected_port);
-
+    int filed = djoin(myNode,selected_ip,selected_port,myNode->cacheSize);
+    if (filed==-1)
+    {
+        close(fd);
+        close(filed);
+        freeaddrinfo(res);
+        return 0;
+    }
+    
+    printf("o file descas é este lol [%d]\n",filed);
     char msgServer[BUFFER_SIZE];
     snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
     n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
@@ -533,6 +552,18 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     if (n == -1) /*error*/ exit(1);
     printf("\n\tNó registado na net %s\n\n", net);
 
+    n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
+    if (n == -1) return -1;
+
+    printf("Estou aqui seu boi do caralho\n");
+    buffer[n]='\0';
+    if (strcmp(buffer,"OKREG")==0)
+    {
+        printf("»»%s\n",buffer);
+    }else{
+        printf("Fora daquele nó estranho %s\n",buffer);
+    }
+    printf("");
     // Store the selected IP and port in variables
     // (You might want to modify the function parameters to pass these back)
     // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
@@ -542,10 +573,11 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
     return filed;
 }
 
-int djoin(NodeData *myNode, char *connectIP, int connectTCP) {
+int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
     if (strcmp(connectIP, "0.0.0.0") == 0) {
         printf("Criando rede com nó raiz (%s:%d)\n", myNode->ip, myNode->tcp_port);
-        
+        // init_node(myNode, cache_size, connectIP, connectTCP);
+
         // Inicializar o nó como raiz
         strncpy(myNode->vzext.ip, myNode->ip, sizeof(myNode->vzext.ip));
         myNode->vzext.tcp_port = myNode->tcp_port;
