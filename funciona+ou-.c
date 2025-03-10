@@ -80,15 +80,15 @@ int main(int argc, char *argv[]) {
 
     printf("Inicializando nó...\n");
 
-    init_node(&my_node, cache_size, reg_server_ip, reg_server_port);
+    // init_node(&my_node, cache_size, reg_server_ip, reg_server_port);
 
     printf("NDN Node started. Enter commands:\n\n");
 
     fd_set master_fds, read_fds;
     FD_ZERO(&master_fds);
     FD_SET(STDIN_FILENO, &master_fds);         // Adicionar stdin para comandos de usuário
-    FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
-    int max_fd = my_node.socket_listening; 
+    // FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
+    int max_fd = STDIN_FILENO; 
 
     // Adicionar sockets de conexão existentes ao master_fds
     if (my_node.vzext.socket_fd > 0) {
@@ -104,7 +104,8 @@ int main(int argc, char *argv[]) {
     }
 
     char command[BUFFER_SIZE];
-    
+    my_node.socket_listening=-1;
+    my_node.flaginit=0;
     while (1) {
     read_fds = master_fds;
     printf("> ");
@@ -125,6 +126,12 @@ int main(int argc, char *argv[]) {
                 if (fgets(command, sizeof(command), stdin) != NULL) {
                     command[strcspn(command, "\n")] = '\0';  // Remover \n
                     int fd = handle_command(command, &my_node, reg_server_ip, reg_server_port);
+                    
+                    if(my_node.socket_listening!=-1 && my_node.flaginit==0){    
+                        FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
+                        my_node.flaginit=1;
+                    }
+
                     if (fd != 0) {
                         FD_SET(fd, &master_fds);
                         if (max_fd < fd) {
@@ -574,7 +581,8 @@ int join(char *net, char *ip, int port,NodeData *myNode) {
 }
 
 int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
-    if (strcmp(connectIP, "0.0.0.0") == 0) {
+    printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
+    if (strcmp(connectIP, "0.0.0.0") == 0 && myNode->flaginit == 0) {
         printf("Criando rede com nó raiz (%s:%d)\n", myNode->ip, myNode->tcp_port);
         // init_node(myNode, cache_size, connectIP, connectTCP);
 
@@ -591,7 +599,7 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         myNode->numInternals = 0;
         
         return 0;
-    } else {
+    } else if(myNode->flaginit==1){
         // Conectar ao nó externo especificado
         int sockfd = connect_to_node(connectIP, connectTCP);
         if (sockfd < 0) {
@@ -622,7 +630,12 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         
         // A resposta SAFE será tratada no loop principal que lê as mensagens recebidas
         return sockfd;
+    }else
+    {
+        printf("O nó ainda não foi inicializado, dê djoin ao ip 0.0.0.0\n");
+        return 0;
     }
+    
 }
 
 
