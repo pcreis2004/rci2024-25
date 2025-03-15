@@ -14,15 +14,17 @@ Cenas a fazer:
 	CHECK --- Fazer o comando join
 
 
-	Fazer a cena do nó sozinho na rede
-	Fazer a separação de mensagens entre nós
-	Ouvir a mensagem do servidor
+	CHECK --- Fazer a cena do nó sozinho na rede
+	Fazer a separação de mensagens entre nós   ----- PRIORIDADE
+	CHECK --- Ouvir a mensagem do servidor
 	Loop para escrita e cenas
 	
 Issues:
-	Será que a cena do usleep é a melhor alternative??? Se calhar perguntas à prof
+	
 Resolvido:
+	O join vai ter que retornar dois fd's, como fazer isso, ou será que devo procurar uma alternativa?
 
+	Será que a cena do usleep é a melhor alternative??? Se calhar perguntas à prof
 	Arranjar maneira de arranjar a mensagem extra de SAFE que está a ser enviada
 	
 	o servidor não é tão rápido como o da aula
