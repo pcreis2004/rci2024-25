@@ -15,12 +15,12 @@ Cenas a fazer:
 
 
 	CHECK --- Fazer a cena do nó sozinho na rede
-	CHECK DUVIDOSO -- Fazer a separação de mensagens entre nós   ----- PRIORIDADE
+	CHECK DUVIDOSO -- Fazer a separação de mensagens entre nós  
 	CHECK --- Ouvir a mensagem do servidor
-	Loop para escrita e cenas -- VER COM A PROF
+	Loop para escrita e cenas -- VER COM A PROF --- PRIORIDADE
 	
 Issues:
-	
+	Para enviar mensagens entre nós devo usar o send ou o write???	
 Resolvido:
 	O join vai ter que retornar dois fd's, como fazer isso, ou será que devo procurar uma alternativa?
 

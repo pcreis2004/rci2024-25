@@ -211,8 +211,8 @@ int main(int argc, char *argv[]) {
                                     snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
                                             my_node.vzext.ip, my_node.vzext.tcp_port);
                                             
-                                    if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
-                                        perror("send SAFE");
+                                    if (write(i, safe_msg, strlen(safe_msg)) < 0) {
+                                        perror("write SAFE");
                                     } else {
                                         // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
                                     }
@@ -225,8 +225,8 @@ int main(int argc, char *argv[]) {
                                     snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", 
                                             my_node.ip, my_node.tcp_port);
                                     
-                                    if (send(i, entry_msg, strlen(entry_msg), 0) < 0) {
-                                        perror("send ENTRY");
+                                    if (write(i, entry_msg, strlen(entry_msg)) < 0) {
+                                        perror("write ENTRY");
                                     } else {
                                         // printf("\t\tMensagem enviada para fd: %d ---> %s", i, entry_msg);
                                     }
@@ -242,8 +242,8 @@ int main(int argc, char *argv[]) {
                                         snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
                                                 my_node.vzext.ip, my_node.vzext.tcp_port);
                                                 
-                                        if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
-                                            perror("send SAFE");
+                                        if (write(i, safe_msg, strlen(safe_msg)) < 0) {
+                                            perror("write SAFE");
                                         } else {
                                             // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
                                         }
@@ -627,8 +627,8 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         char entry_msg[BUFFER_SIZE];
         snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", myNode->ip, myNode->tcp_port);
         
-        if (send(sockfd, entry_msg, strlen(entry_msg), 0) < 0) {
-            perror("send ENTRY");
+        if (write(sockfd, entry_msg, strlen(entry_msg)) < 0) {
+            perror("write ENTRY");
             return -1;
         }
         
