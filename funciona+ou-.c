@@ -48,6 +48,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor);
 void show_topology(NodeData *myNode);
 
 int main(int argc, char *argv[]) {
+
     if (argc < 4) {
         printf("Usage: %s cache IP TCP [regIP] [regUDP]\n", argv[0]);
         return 1;
@@ -94,168 +95,183 @@ int main(int argc, char *argv[]) {
     my_node.socket_listening=-1;
     my_node.flaginit=0;
     while (1) {
-    read_fds = master_fds;
-    printf("> ");
-    fflush(stdout);
-    
-    if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1) {
-        perror("select");
-        exit(1);
-    }
 
-    char buffer[BUFFER_SIZE];
-    
-    // Verificar todas as conexões para atividade
-    for (int i = 0; i <= max_fd; i++) {
-        if (FD_ISSET(i, &read_fds)) {
-            // Entrada do usuário no terminal
-            if (i == STDIN_FILENO) {
-                if (fgets(command, sizeof(command), stdin) != NULL) {
-                    command[strcspn(command, "\n")] = '\0';  // Remover \n
-                    int fd = handle_command(command, &my_node, reg_server_ip, reg_server_port);
-                    // printf("\t> flag está a %d e o fd retornado foi %d, a socket de listening está a %d\n",my_node.flaginit,fd,my_node.socket_listening);
-                    
-                    if(my_node.socket_listening!=-1 && my_node.flaginit==0){    
-                        FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
-                        my_node.flaginit=1;
-                        if (max_fd < my_node.socket_listening) {
-                            max_fd = my_node.socket_listening;
-                        }
-                    }
-                    if (fd != 0) {
-                        FD_SET(fd, &master_fds);
-                        if (max_fd < fd) {
-                            max_fd = fd;
-                        }
-                    }
-                }
-            }
-            // printf("Primeira parte do loop ultrapassada com sucesso\n");
-            // Nova conexão no socket de escuta
-            else if (i == my_node.socket_listening) {
-                struct sockaddr_in client_addr;
-                socklen_t addrlen = sizeof(client_addr);
-                int new_fd = accept(my_node.socket_listening, (struct sockaddr *)&client_addr, &addrlen);
-                
-                if (new_fd == -1) {
-                    perror("accept");
-                } else {
-                    FD_SET(new_fd, &master_fds);
-                    if (new_fd > max_fd) max_fd = new_fd;
-                    printf("Nova conexão aceita: FD %d\n\n", new_fd);
-                }
-            }
-            
-            // Dados recebidos de uma conexão existente
-            else {
-                memset(buffer, 0, BUFFER_SIZE);
-                int n = read(i, buffer, BUFFER_SIZE - 1);
-                
-                if (n <= 0) {
-                    if (n == 0) {
-                        printf("Conexão fechada no FD %d\n", i);
-                        // Tratar terminação de sessão conforme o protocolo
-                    } else {
-                        perror("read");
-                    }
-                    close(i);
-                    FD_CLR(i, &master_fds);
-                } else {
-                    buffer[n] = '\0';  // Garantir terminação da string
-                    printf("Recebido do FD %d: [%s]\n", i, buffer);
-                    
-                    // Processamento das mensagens do protocolo
-                    if (strncmp(buffer, "ENTRY", 5) == 0) {
-                        // printf("recebi uma mensagem de entry lol\n");
-                        // Processar mensagem ENTRY
-                        char ip[16];
-                        int tcp_port;
+        read_fds = master_fds;
+        printf("> ");
+        fflush(stdout);
+        
+        if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1) {
+            perror("select");
+            exit(1);
+        }
+
+        char buffer[BUFFER_SIZE];
+        
+        // Verificar todas as conexões para atividade
+        for (int i = 0; i <= max_fd; i++) {
+            if (FD_ISSET(i, &read_fds)) {
+                // Entrada do usuário no terminal
+                if (i == STDIN_FILENO) {
+
+                    if (fgets(command, sizeof(command), stdin) != NULL) {
+                        command[strcspn(command, "\n")] = '\0';  // Remover \n
+                        int fd = handle_command(command, &my_node, reg_server_ip, reg_server_port);
+                        // printf("\t> flag está a %d e o fd retornado foi %d, a socket de listening está a %d\n",my_node.flaginit,fd,my_node.socket_listening);
                         
-                        if (sscanf(buffer + 6, "%15s %d", ip, &tcp_port) == 2) {
-                            NodeID new_node;
-                            strncpy(new_node.ip, ip, sizeof(new_node.ip) - 1);
-                            new_node.ip[sizeof(new_node.ip) - 1] = '\0';
-                            new_node.tcp_port = tcp_port;
-                            new_node.socket_fd = i;
+                        if(my_node.socket_listening!=-1 && my_node.flaginit==0){    
+                            FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
+                            my_node.flaginit=1;
+                            if (max_fd < my_node.socket_listening) {
+                                max_fd = my_node.socket_listening;
+                            }
+                        }
+                        if (fd != 0) {
+                            FD_SET(fd, &master_fds);
+                            if (max_fd < fd) {
+                                max_fd = fd;
+                            }
+                        }
+                    }
+                }
+                // printf("Primeira parte do loop ultrapassada com sucesso\n");
+                
+                // Nova conexão no socket de escuta
+                else if (i == my_node.socket_listening) {
+                    struct sockaddr_in client_addr;
+                    socklen_t addrlen = sizeof(client_addr);
+                    int new_fd = accept(my_node.socket_listening, (struct sockaddr *)&client_addr, &addrlen);
+                    
+                    if (new_fd == -1) {
+                        perror("accept");
+                    } else {
+                        FD_SET(new_fd, &master_fds);
+                        if (new_fd > max_fd) max_fd = new_fd;
+                        printf("Nova conexão aceita: FD %d\n\n", new_fd);
+                    }
+                }
+                
+                // Dados recebidos de uma conexão existente
+                else {
+                    memset(buffer, 0, BUFFER_SIZE);
+                    int n = read(i, buffer, BUFFER_SIZE - 1);
+                    
+                    if (n <= 0) {
+                        if (n == 0) {
+                            printf("Conexão fechada no FD %d\n", i);
+                            // Tratar terminação de sessão conforme o protocolo
+                        } else {
+                            perror("read");
+                        }
+                        close(i);
+                        FD_CLR(i, &master_fds);
+                    } else {
+                        buffer[n] = '\0';  // Garantir terminação da string
+
+                    char *message = buffer;
+                    char *next_message;
+
+                    //ciclo que lê todas as mensagens no buffer    
+                    while ((next_message = strchr(message, '\n')) != NULL) {
+                        *next_message = '\0';  // muda o \n para marcar a mensagem como lida
+                        
+                        // printf("Recebido do FD %d: [%s] < ---- ,message\nnext_message--->[%s]\nbuffer->[%s]\n", i, message,next_message,buffer);
+                        
+                        printf("Recebido do FD %d: [%s]\n", i, buffer);
+                        
+                        // Processamento das mensagens do protocolo
                             
-                            // Verificar se o nó atual tem vizinho externo
-                            if (my_node.vzext.tcp_port == -1) {
-                                // Se não tiver vizinho externo, o nó que está se juntando se torna o vizinho externo
-                                strncpy(my_node.vzext.ip, new_node.ip, sizeof(my_node.vzext.ip) - 1);
-                                my_node.vzext.ip[sizeof(my_node.vzext.ip) - 1] = '\0';
-                                my_node.vzext.tcp_port = new_node.tcp_port;
-                                my_node.vzext.socket_fd = i;
+                            // Processar mensagem ENTRY
+                        if (strncmp(message, "ENTRY", 5) == 0) {
+                            char ip[16];
+                            int tcp_port;
+                            
+                            if (sscanf(buffer + 6, "%15s %d", ip, &tcp_port) == 2) {
+                                NodeID new_node;
+                                strncpy(new_node.ip, ip, sizeof(new_node.ip) - 1);
+                                new_node.ip[sizeof(new_node.ip) - 1] = '\0';
+                                new_node.tcp_port = tcp_port;
+                                new_node.socket_fd = i;
                                 
-                                // printf("Novo vizinho externo definido: %s:%d\n", my_node.vzext.ip, my_node.vzext.tcp_port);
-                                
-                                // Adicionar como vizinho interno
-                                // printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
-                                add_internal_neighbor(&my_node, new_node);
-                                
-                                // Primeiro, enviar mensagem SAFE
-                                char safe_msg[BUFFER_SIZE];
-                                snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
-                                         my_node.vzext.ip, my_node.vzext.tcp_port);
-                                         
-                                if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
-                                    perror("send SAFE");
-                                } else {
-                                    // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
-                                }
-                                
-                                // Introduzir um pequeno atraso para garantir que as mensagens sejam processadas separadamente
-                                usleep(100000);  // 100ms
-                                
-                                // Depois, enviar mensagem ENTRY
-                                char entry_msg[BUFFER_SIZE];
-                                snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", 
-                                         my_node.ip, my_node.tcp_port);
-                                
-                                if (send(i, entry_msg, strlen(entry_msg), 0) < 0) {
-                                    perror("send ENTRY");
-                                } else {
-                                    // printf("\t\tMensagem enviada para fd: %d ---> %s", i, entry_msg);
-                                }
-                            } else {
-                                // Adicionar como vizinho interno apenas se não for o vizinho externo
-                                
+                                // Verificar se o nó atual tem vizinho externo
+                                if (my_node.vzext.tcp_port == -1) {
+                                    // Se não tiver vizinho externo, o nó que está se juntando se torna o vizinho externo
+                                    strncpy(my_node.vzext.ip, new_node.ip, sizeof(my_node.vzext.ip) - 1);
+                                    my_node.vzext.ip[sizeof(my_node.vzext.ip) - 1] = '\0';
+                                    my_node.vzext.tcp_port = new_node.tcp_port;
+                                    my_node.vzext.socket_fd = i;
                                     
+                                    // printf("Novo vizinho externo definido: %s:%d\n", my_node.vzext.ip, my_node.vzext.tcp_port);
+                                    
+                                    // Adicionar como vizinho interno
                                     // printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
                                     add_internal_neighbor(&my_node, new_node);
                                     
-                                    // Enviar mensagem SAFE com o vizinho externo
+                                    // Primeiro, enviar mensagem SAFE
                                     char safe_msg[BUFFER_SIZE];
                                     snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
-                                             my_node.vzext.ip, my_node.vzext.tcp_port);
-                                             
+                                            my_node.vzext.ip, my_node.vzext.tcp_port);
+                                            
                                     if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
                                         perror("send SAFE");
                                     } else {
                                         // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
                                     }
-                                
+                                    
+                                    // Introduzir um pequeno atraso para garantir que as mensagens sejam processadas separadamente
+                                    // usleep(100000);  // 100ms
+                                    
+                                    // Depois, enviar mensagem ENTRY
+                                    char entry_msg[BUFFER_SIZE];
+                                    snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", 
+                                            my_node.ip, my_node.tcp_port);
+                                    
+                                    if (send(i, entry_msg, strlen(entry_msg), 0) < 0) {
+                                        perror("send ENTRY");
+                                    } else {
+                                        // printf("\t\tMensagem enviada para fd: %d ---> %s", i, entry_msg);
+                                    }
+                                } else {
+                                    // Adicionar como vizinho interno apenas se não for o vizinho externo
+                                    
+                                        
+                                        // printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
+                                        add_internal_neighbor(&my_node, new_node);
+                                        
+                                        // Enviar mensagem SAFE com o vizinho externo
+                                        char safe_msg[BUFFER_SIZE];
+                                        snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
+                                                my_node.vzext.ip, my_node.vzext.tcp_port);
+                                                
+                                        if (send(i, safe_msg, strlen(safe_msg), 0) < 0) {
+                                            perror("send SAFE");
+                                        } else {
+                                            // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
+                                        }
+                                    
+                                }
                             }
                         }
-                    }
-                    else if (strncmp(buffer, "SAFE", 4) == 0) {
-                        // Processar mensagem SAFE
-                        // printf("\t\tMensagem de safe a ser processada\n");
-                        char ip[16];
-                        int tcp_port;
-                        if (sscanf(buffer + 5, "%15s %d", ip, &tcp_port) == 2) {
-                            // Atualizar nó de salvaguarda
-                            strncpy(my_node.vzsalv.ip, ip, sizeof(my_node.vzsalv.ip) - 1);
-                            my_node.vzsalv.ip[sizeof(my_node.vzsalv.ip) - 1] = '\0';
-                            my_node.vzsalv.tcp_port = tcp_port;
-                            // printf("Nó de salvaguarda atualizado: %s:%d\n", 
-                                //    my_node.vzsalv.ip, my_node.vzsalv.tcp_port);
+                            // Processar mensagem SAFE
+                        else if (strncmp(message, "SAFE", 4) == 0) {
+                            // printf("\t\tMensagem de safe a ser processada\n");
+                            char ip[16];
+                            int tcp_port;
+                            if (sscanf(buffer + 5, "%15s %d", ip, &tcp_port) == 2) {
+                                // Atualizar nó de salvaguarda
+                                strncpy(my_node.vzsalv.ip, ip, sizeof(my_node.vzsalv.ip) - 1);
+                                my_node.vzsalv.ip[sizeof(my_node.vzsalv.ip) - 1] = '\0';
+                                my_node.vzsalv.tcp_port = tcp_port;
+                                // printf("Nó de salvaguarda atualizado: %s:%d\n", 
+                                    //    my_node.vzsalv.ip, my_node.vzsalv.tcp_port);
+                            }
                         }
+                    message = next_message + 1;
+                    }
                     }
                 }
             }
         }
     }
-}
     return 0;
 }
 

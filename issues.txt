@@ -15,9 +15,9 @@ Cenas a fazer:
 
 
 	CHECK --- Fazer a cena do nó sozinho na rede
-	Fazer a separação de mensagens entre nós   ----- PRIORIDADE
+	CHECK DUVIDOSO -- Fazer a separação de mensagens entre nós   ----- PRIORIDADE
 	CHECK --- Ouvir a mensagem do servidor
-	Loop para escrita e cenas
+	Loop para escrita e cenas -- VER COM A PROF
 	
 Issues:
 	
