@@ -154,7 +154,6 @@ int main(int argc, char *argv[]) {
                 else {
                     memset(buffer, 0, BUFFER_SIZE);
                     int n = read(i, buffer, BUFFER_SIZE - 1);
-                    
                     if (n <= 0) {
                         if (n == 0) {
                             printf("Conexão fechada no FD %d\n", i);
@@ -174,9 +173,9 @@ int main(int argc, char *argv[]) {
                     while ((next_message = strchr(message, '\n')) != NULL) {
                         *next_message = '\0';  // muda o \n para marcar a mensagem como lida
                         
-                        // printf("Recebido do FD %d: [%s] < ---- ,message\nnext_message--->[%s]\nbuffer->[%s]\n", i, message,next_message,buffer);
+                        printf("Recebido do FD %d: [%s] < ---- ,message\nnext_message--->[%s]\nbuffer->[%s]\n", i, message,next_message,buffer);
                         
-                        printf("Recebido do FD %d: [%s]\n", i, buffer);
+                        // printf("Recebido do FD %d: [%s]\n", i, buffer);
                         
                         // Processamento das mensagens do protocolo
                             
@@ -200,53 +199,63 @@ int main(int argc, char *argv[]) {
                                     my_node.vzext.tcp_port = new_node.tcp_port;
                                     my_node.vzext.socket_fd = i;
                                     
-                                    // printf("Novo vizinho externo definido: %s:%d\n", my_node.vzext.ip, my_node.vzext.tcp_port);
                                     
                                     // Adicionar como vizinho interno
-                                    // printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
                                     add_internal_neighbor(&my_node, new_node);
                                     
                                     // Primeiro, enviar mensagem SAFE
-                                    char safe_msg[BUFFER_SIZE];
-                                    snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
-                                            my_node.vzext.ip, my_node.vzext.tcp_port);
-                                            
-                                    if (write(i, safe_msg, strlen(safe_msg)) < 0) {
-                                        perror("write SAFE");
-                                    } else {
-                                        // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
-                                    }
+                                    ssize_t nleft,nwritten;
+                                    char safe_msg[BUFFER_SIZE],*ptr;
+                                    snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n",my_node.vzext.ip, my_node.vzext.tcp_port);
+                                      
+                                    ptr=safe_msg;
+                                    nleft=strlen(safe_msg);
                                     
-                                    // Introduzir um pequeno atraso para garantir que as mensagens sejam processadas separadamente
-                                    // usleep(100000);  // 100ms
+                                    while (nleft>0)
+                                    {
+                                        nwritten=write(i,ptr,nleft);
+                                        if(nwritten<=0)/*error*/exit(1);
+                                        nleft-=nwritten;
+                                        ptr+=nwritten;
+                                    }                                    
+                                    
                                     
                                     // Depois, enviar mensagem ENTRY
                                     char entry_msg[BUFFER_SIZE];
                                     snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", 
                                             my_node.ip, my_node.tcp_port);
                                     
-                                    if (write(i, entry_msg, strlen(entry_msg)) < 0) {
-                                        perror("write ENTRY");
-                                    } else {
-                                        // printf("\t\tMensagem enviada para fd: %d ---> %s", i, entry_msg);
-                                    }
+                                            ptr=entry_msg;
+                                            nleft=strlen(entry_msg);
+                                            
+                                            while (nleft>0)
+                                            {
+                                                nwritten=write(i,ptr,nleft);
+                                                if(nwritten<=0)/*error*/exit(1);
+                                                nleft-=nwritten;
+                                                ptr+=nwritten;
+                                            }
                                 } else {
                                     // Adicionar como vizinho interno apenas se não for o vizinho externo
+                                    add_internal_neighbor(&my_node, new_node);
                                     
-                                        
-                                        // printf("Adicionar vizinho interno %s --> %d\n", ip, tcp_port);
-                                        add_internal_neighbor(&my_node, new_node);
-                                        
-                                        // Enviar mensagem SAFE com o vizinho externo
-                                        char safe_msg[BUFFER_SIZE];
-                                        snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
-                                                my_node.vzext.ip, my_node.vzext.tcp_port);
-                                                
-                                        if (write(i, safe_msg, strlen(safe_msg)) < 0) {
-                                            perror("write SAFE");
-                                        } else {
-                                            // printf("\t\tMensagem enviada para fd: %d ---> %s", i, safe_msg);
-                                        }
+                                    ssize_t nleft,nwritten;       
+                                    // Enviar mensagem SAFE com o vizinho externo
+                                    char safe_msg[BUFFER_SIZE],*ptr;
+
+                                    snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
+                                            my_node.vzext.ip, my_node.vzext.tcp_port);
+                                            
+                                            ptr=safe_msg;
+                                            nleft=strlen(safe_msg);
+                                            
+                                            while (nleft>0)
+                                            {
+                                                nwritten=write(i,ptr,nleft);
+                                                if(nwritten<=0)/*error*/exit(1);
+                                                nleft-=nwritten;
+                                                ptr+=nwritten;
+                                            }
                                     
                                 }
                             }
@@ -596,6 +605,8 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
 
 int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
     printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
+    ssize_t nleft,nwritten;
+    char *ptr;
     if (strcmp(connectIP, "0.0.0.0") == 0 && myNode->flaginit == 0) {
 
         printf("Criando rede com nó raiz (%s:%d)\n", myNode->ip, myNode->tcp_port);
@@ -626,10 +637,15 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         // Enviar mensagem ENTRY
         char entry_msg[BUFFER_SIZE];
         snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", myNode->ip, myNode->tcp_port);
+        ptr=entry_msg;
+        nleft=strlen(entry_msg);
         
-        if (write(sockfd, entry_msg, strlen(entry_msg)) < 0) {
-            perror("write ENTRY");
-            return -1;
+        while (nleft>0)
+        {
+            nwritten=write(sockfd,ptr,nleft);
+            if(nwritten<=0)/*error*/exit(1);
+            nleft-=nwritten;
+            ptr+=nwritten;
         }
         
         printf("\n\tLigado na Socket:%d ao nó %s %d\n\n",sockfd,connectIP,connectTCP);
