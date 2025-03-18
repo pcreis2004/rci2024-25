@@ -77,17 +77,68 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     else if (strcmp(cmd,"j")==0)
     {
         int fd = join(arg1,ip,port,myNode,myNode->cacheSize);
+        strcpy(myNode->net,arg1);
         return fd;
     }
     
     else if (strcmp(cmd, "st") == 0) {
         show_topology(myNode);
+    }else if (strcmp(cmd,"l")==0)
+    {
+        leave(myNode,ip,port);
     }
+    
+
+
     else {
         printf("Comando desconhecido: %s\n", command);
     }
     return 0;
 }
+
+int leave(NodeData *myNode, char *serverIp,int serverPort){
+    socklen_t addrlen;
+    struct sockaddr addr;
+    struct addrinfo hints, *res;
+    int fd, errcode;
+    ssize_t n;
+    char buffer[BUFFER_SIZE];
+
+    
+    fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
+    if (fd == -1) /*error*/ exit(1);
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET; // IPv4
+    hints.ai_socktype = SOCK_DGRAM; // UDP socket
+    
+    sprintf(buffer, "%d", serverPort);
+
+    errcode = getaddrinfo(serverIp, buffer, &hints, &res);
+    if (errcode != 0) return -1;
+
+
+    snprintf(buffer, sizeof(buffer), "UNREG %s %s %d\n", myNode->net, myNode->ip, myNode->tcp_port);
+    printf("\t\t\t%s\n",buffer);
+
+
+    n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
+    if (n == -1) /*error*/ exit(1);
+
+    n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
+    if (n == -1) return -1;
+
+    buffer[n]='\0';
+    //IMPRIMIR AQUI PARA DEBUG
+    printf("\t\t\t%s\n",buffer);
+    printf("flaginit = %d\n",myNode->flaginit);
+    close(fd);
+
+    return 0;
+}
+
+
+
 /* Função: join
    Liga o nó atual a uma rede lógica através do registrador,
    registando o nó e tentando ligar-se a um nó aleatório existente, se houver.
@@ -110,8 +161,13 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     ssize_t n;
     
     //inicializar nó antes de o connectar ao servidor
-    int listening = init_node(myNode,cache_size);
-    if(listening==-1) exit(1);
+   
+    if (myNode->flaginit==0)
+    {
+        int listening = init_node(myNode,cache_size);
+        if(listening==-1) exit(1);
+    }
+    
 
 
     fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket

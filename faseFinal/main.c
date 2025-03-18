@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     strncpy(my_node.ip, argv[2], sizeof(my_node.ip) - 1);
     my_node.ip[sizeof(my_node.ip) - 1] = '\0';
     my_node.tcp_port = atoi(argv[3]);
-
+    strcpy(my_node.net,"xxx");
     char reg_server_ip[16];
     int reg_server_port;
     int cache_size = atoi(argv[1]);

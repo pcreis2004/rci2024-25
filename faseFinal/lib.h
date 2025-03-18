@@ -13,7 +13,8 @@ typedef struct NodeID {
 
 typedef struct {
     int flaginit;
-    char ip[16];           // IP do nó atual
+    char ip[16];
+    char net[4];           // IP do nó atual
     int tcp_port;          // Porto TCP do nó atual
     int socket_listening;  // Socket de escuta para conexões entrantes
     NodeID vzext;          // Vizinho externo
