@@ -15,13 +15,19 @@ Cenas a fazer:
 
 
 	CHECK --- Fazer a cena do nó sozinho na rede
-	CHECK DUVIDOSO -- Fazer a separação de mensagens entre nós  
+	CHECK --- Fazer a separação de mensagens entre nós  
 	CHECK --- Ouvir a mensagem do servidor
-	Loop para escrita e cenas -- VER COM A PROF --- PRIORIDADE
-	
+	CHECK --- Loop para escrita e cenas
+
+
+	Dividir o código por ficheiros 
+	Implementar a saída de um nó da rede (leave) l 
+	Começar a implementar objetos	
 Issues:
-	Para enviar mensagens entre nós devo usar o send ou o write???	
+
 Resolvido:
+	Para enviar mensagens entre nós devo usar o send ou o write???	
+
 	O join vai ter que retornar dois fd's, como fazer isso, ou será que devo procurar uma alternativa?
 
 	Será que a cena do usleep é a melhor alternative??? Se calhar perguntas à prof

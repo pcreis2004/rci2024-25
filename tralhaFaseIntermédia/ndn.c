@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     printf("Configuração:\n Cache: %d\n IP: %s\n TCP: %d\n RegIP: %s\n RegUDP: %d\n",
            cache_size, my_node.ip, my_node.tcp_port, reg_server_ip, reg_server_port);
 
-    printf("Inicializando nó...\n");
+    // printf("Inicializando nó...\n");
 
     //init_node(&my_node, cache_size, reg_server_ip, reg_server_port);
 
@@ -116,7 +116,6 @@ int main(int argc, char *argv[]) {
                     if (fgets(command, sizeof(command), stdin) != NULL) {
                         command[strcspn(command, "\n")] = '\0';  // Remover \n
                         int fd = handle_command(command, &my_node, reg_server_ip, reg_server_port);
-                        // printf("\t> flag está a %d e o fd retornado foi %d, a socket de listening está a %d\n",my_node.flaginit,fd,my_node.socket_listening);
                         
                         if(my_node.socket_listening!=-1 && my_node.flaginit==0){    
                             FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
@@ -133,7 +132,6 @@ int main(int argc, char *argv[]) {
                         }
                     }
                 }
-                // printf("Primeira parte do loop ultrapassada com sucesso\n");
                 
                 // Nova conexão no socket de escuta
                 else if (i == my_node.socket_listening) {
@@ -146,7 +144,7 @@ int main(int argc, char *argv[]) {
                     } else {
                         FD_SET(new_fd, &master_fds);
                         if (new_fd > max_fd) max_fd = new_fd;
-                        printf("Nova conexão aceita: FD %d\n\n", new_fd);
+                        printf("Nova conexão aceita: FD %d\n", new_fd);
                     }
                 }
                 
@@ -173,9 +171,7 @@ int main(int argc, char *argv[]) {
                     while ((next_message = strchr(message, '\n')) != NULL) {
                         *next_message = '\0';  // muda o \n para marcar a mensagem como lida
                         
-                        // printf("Recebido do FD %d: [%s] < ---- ,message\nnext_message--->[%s]\nbuffer->[%s]\n", i, message,next_message,buffer);
                         
-                        printf("Recebido do FD %d: {%s]}\n", i, message);
                         
                         // Processamento das mensagens do protocolo
                             
@@ -183,7 +179,7 @@ int main(int argc, char *argv[]) {
                         if (strncmp(message, "ENTRY", 5) == 0) {
                             char ip[16];
                             int tcp_port;
-                            
+                            printf("A processar mensagem de entry\n");
                             if (sscanf(message + 6, "%15s %d", ip, &tcp_port) == 2) {
                                 NodeID new_node;
                                 strncpy(new_node.ip, ip, sizeof(new_node.ip) - 1);
@@ -214,7 +210,6 @@ int main(int argc, char *argv[]) {
                                     while (nleft>0)
                                     {
                                         nwritten=write(i,ptr,nleft);
-                                        printf("\t\t\tmensagem enviada %s\n",ptr);
                                         if(nwritten<=0)/*error*/exit(1);
                                         nleft-=nwritten;
                                         ptr+=nwritten;
@@ -232,7 +227,6 @@ int main(int argc, char *argv[]) {
                                             while (nleft>0)
                                             {
                                                 nwritten=write(i,ptr,nleft);
-                                                printf("\t\t\tmensagem enviada %s\n",ptr);
                                                 if(nwritten<=0)/*error*/exit(1);
                                                 nleft-=nwritten;
                                                 ptr+=nwritten;
@@ -254,7 +248,6 @@ int main(int argc, char *argv[]) {
                                             while (nleft>0)
                                             {
                                                 nwritten=write(i,ptr,nleft);
-                                                printf("\t\t\tmensagem enviada %s\n",ptr);
                                                 if(nwritten<=0)/*error*/exit(1);
                                                 nleft-=nwritten;
                                                 ptr+=nwritten;
@@ -265,7 +258,7 @@ int main(int argc, char *argv[]) {
                         }
                             // Processar mensagem SAFE
                         else if (strncmp(message, "SAFE", 4) == 0) {
-                            // printf("\t\tMensagem de safe a ser processada\n");
+                            printf("A processar mensagem de safe\n");
                             char ip[16];
                             int tcp_port;
                             if (sscanf(message + 5, "%15s %d", ip, &tcp_port) == 2) {
@@ -273,8 +266,6 @@ int main(int argc, char *argv[]) {
                                 strncpy(my_node.vzsalv.ip, ip, sizeof(my_node.vzsalv.ip) - 1);
                                 my_node.vzsalv.ip[sizeof(my_node.vzsalv.ip) - 1] = '\0';
                                 my_node.vzsalv.tcp_port = tcp_port;
-                                // printf("Nó de salvaguarda atualizado: %s:%d\n", 
-                                    //    my_node.vzsalv.ip, my_node.vzsalv.tcp_port);
                             }
                         }
                     message = next_message + 1;
@@ -449,7 +440,6 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
         }
     }
     else if ((strcmp(cmd, "dj") == 0 || strcmp(cmd, "direct_join") == 0) && args >= 3) {
-        // printf("Conectando ao nó %s:%s...\n", arg1, arg2);
         int fd = djoin(myNode, arg1, atoi(arg2),myNode->cacheSize);
         return fd;
     }
@@ -509,7 +499,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     if (n == -1) return -1;
     
     buffer[n] = '\0';
-    printf("\tNó connectado à net %s\n\n", net);
+    printf("Nó connectado à net %s\n", net);
     
     // Parse the response to get IP addresses and ports
     char *line = strtok(buffer, "\n");
@@ -538,13 +528,13 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
 
         n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
 
-        buffer[n]='\0';
-    if (strcmp(buffer,"OKREG")==0)
-    {
-        printf("»»%s\n",buffer);
-    }else{
-        printf("Fora daquele nó estranho %s\n",buffer);
-    }
+    //     buffer[n]='\0';
+    // if (strcmp(buffer,"OKREG")==0)
+    // {
+    //     printf("»»%s\n",buffer);
+    // }else{
+    //     printf("Fora daquele nó estranho %s\n",buffer);
+    // }
         // Store the selected IP and port in variables
         // (You might want to modify the function parameters to pass these back)
         // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
@@ -583,19 +573,19 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
     // printf("Nó registado no servidor\n");
     if (n == -1) /*error*/ exit(1);
-    printf("\n\tNó registado na net %s\n\n", net);
+    printf("Nó registado na net %s\n\n", net);
 
     n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
     if (n == -1) return -1;
 
     // printf("Estou aqui seu boi do caralho\n");
     buffer[n]='\0';
-    if (strcmp(buffer,"OKREG")==0)
-    {
-        printf("»»%s\n",buffer);
-    }else{
-        printf("Fora daquele nó estranho %s\n",buffer);
-    }
+    // if (strcmp(buffer,"OKREG")==0)
+    // {
+    //     printf("»»%s\n",buffer);
+    // }else{
+    //     printf("Fora daquele nó estranho %s\n",buffer);
+    // }
     // printf("");
     // Store the selected IP and port in variables
     // (You might want to modify the function parameters to pass these back)
@@ -607,7 +597,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
 }
 
 int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
-    printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
+    // printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
     ssize_t nleft,nwritten;
     char *ptr;
     if (strcmp(connectIP, "0.0.0.0") == 0 && myNode->flaginit == 0) {
@@ -646,13 +636,13 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         while (nleft>0)
         {
             nwritten=write(sockfd,ptr,nleft);
-            printf("\t\t\tmensagem enviada %s\n",ptr);
+            // printf("\t\t\tmensagem enviada %s\n",ptr);
             if(nwritten<=0)/*error*/exit(1);
             nleft-=nwritten;
             ptr+=nwritten;
         }
         
-        printf("\n\tLigado na Socket:%d ao nó %s %d\n\n",sockfd,connectIP,connectTCP);
+        printf("Ligado na Socket:%d ao nó %s %d\n\n",sockfd,connectIP,connectTCP);
         // printf("\t\tAguardando msg de SAFE . . . \n");
         
         // A resposta SAFE será tratada no loop principal que lê as mensagens recebidas
@@ -732,7 +722,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
     myNode->intr[myNode->numInternals] = neighbor;
     myNode->numInternals++;
     
-    printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
+    // printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
 }
 
 void show_topology(NodeData *myNode) {
