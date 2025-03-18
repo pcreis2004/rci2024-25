@@ -17,13 +17,11 @@
    Parâmetros:
     - myNode: ponteiro para a estrutura NodeData a ser inicializada.
     - cache_size: tamanho máximo da cache do nó.
-    - reg_ip: IP do registrador (não utilizado nesta função).
-    - reg_udp: porto UDP do registrador (não utilizado nesta função).
    Retorno:
     - Descritor do socket de escuta criado para o nó.
 */
 
-int init_node(NodeData *myNode, int cache_size, char *reg_ip, int reg_udp) {
+int init_node(NodeData *myNode, int cache_size) {
     // Inicializar o nó com seu próprio ID como vizinho externo (inicialmente)
     
     memset(&myNode->vzext,0,sizeof(NodeID));

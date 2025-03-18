@@ -110,7 +110,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     ssize_t n;
     
     //inicializar nó antes de o connectar ao servidor
-    int listening = init_node(myNode,cache_size,ip,port);
+    int listening = init_node(myNode,cache_size);
     if(listening==-1) exit(1);
 
 
@@ -254,7 +254,7 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
 
         printf("Criando rede com nó raiz (%s:%d)\n", myNode->ip, myNode->tcp_port);
 
-        int fd = init_node(myNode, cache_size, connectIP, connectTCP);
+        int fd = init_node(myNode, cache_size);
         
         // myNode->flaginit=1;
         
