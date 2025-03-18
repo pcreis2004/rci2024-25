@@ -1,0 +1,15 @@
+Comando a testar ./ndn 100 192.168.1.175 5000 193.136.138.142 59000
+
+Servidor de Nós: 193.136.138.142 59000
+
+Cenas a fazer:
+		
+	Deixar de usar o realloc --- Talvez nem seja necessário
+
+	Implementar a saída de um nó da rede (leave) l 
+	Começar a implementar objetos	
+
+Issues:
+
+Resolvido:
+
