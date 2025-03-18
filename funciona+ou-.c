@@ -173,9 +173,9 @@ int main(int argc, char *argv[]) {
                     while ((next_message = strchr(message, '\n')) != NULL) {
                         *next_message = '\0';  // muda o \n para marcar a mensagem como lida
                         
-                        printf("Recebido do FD %d: [%s] < ---- ,message\nnext_message--->[%s]\nbuffer->[%s]\n", i, message,next_message,buffer);
+                        // printf("Recebido do FD %d: [%s] < ---- ,message\nnext_message--->[%s]\nbuffer->[%s]\n", i, message,next_message,buffer);
                         
-                        // printf("Recebido do FD %d: [%s]\n", i, buffer);
+                        printf("Recebido do FD %d: {%s]}\n", i, message);
                         
                         // Processamento das mensagens do protocolo
                             
@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
                             char ip[16];
                             int tcp_port;
                             
-                            if (sscanf(buffer + 6, "%15s %d", ip, &tcp_port) == 2) {
+                            if (sscanf(message + 6, "%15s %d", ip, &tcp_port) == 2) {
                                 NodeID new_node;
                                 strncpy(new_node.ip, ip, sizeof(new_node.ip) - 1);
                                 new_node.ip[sizeof(new_node.ip) - 1] = '\0';
@@ -214,6 +214,7 @@ int main(int argc, char *argv[]) {
                                     while (nleft>0)
                                     {
                                         nwritten=write(i,ptr,nleft);
+                                        printf("\t\t\tmensagem enviada %s\n",ptr);
                                         if(nwritten<=0)/*error*/exit(1);
                                         nleft-=nwritten;
                                         ptr+=nwritten;
@@ -231,6 +232,7 @@ int main(int argc, char *argv[]) {
                                             while (nleft>0)
                                             {
                                                 nwritten=write(i,ptr,nleft);
+                                                printf("\t\t\tmensagem enviada %s\n",ptr);
                                                 if(nwritten<=0)/*error*/exit(1);
                                                 nleft-=nwritten;
                                                 ptr+=nwritten;
@@ -252,6 +254,7 @@ int main(int argc, char *argv[]) {
                                             while (nleft>0)
                                             {
                                                 nwritten=write(i,ptr,nleft);
+                                                printf("\t\t\tmensagem enviada %s\n",ptr);
                                                 if(nwritten<=0)/*error*/exit(1);
                                                 nleft-=nwritten;
                                                 ptr+=nwritten;
@@ -265,7 +268,7 @@ int main(int argc, char *argv[]) {
                             // printf("\t\tMensagem de safe a ser processada\n");
                             char ip[16];
                             int tcp_port;
-                            if (sscanf(buffer + 5, "%15s %d", ip, &tcp_port) == 2) {
+                            if (sscanf(message + 5, "%15s %d", ip, &tcp_port) == 2) {
                                 // Atualizar nó de salvaguarda
                                 strncpy(my_node.vzsalv.ip, ip, sizeof(my_node.vzsalv.ip) - 1);
                                 my_node.vzsalv.ip[sizeof(my_node.vzsalv.ip) - 1] = '\0';
@@ -643,6 +646,7 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         while (nleft>0)
         {
             nwritten=write(sockfd,ptr,nleft);
+            printf("\t\t\tmensagem enviada %s\n",ptr);
             if(nwritten<=0)/*error*/exit(1);
             nleft-=nwritten;
             ptr+=nwritten;
@@ -728,7 +732,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
     myNode->intr[myNode->numInternals] = neighbor;
     myNode->numInternals++;
     
-    // printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
+    printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
 }
 
 void show_topology(NodeData *myNode) {
