@@ -27,13 +27,14 @@
 */
 
 int handle_command(char *command, NodeData *myNode, char *ip, int port) {
-    // printf("Comando recebido: %s\n", command);
+    printf("Comando recebido: %s\n", command);
 
     char cmd[20];
     char arg1[100], arg2[100];
     
     // Extrair comando e argumentos
     int args = sscanf(command, "%19s %99s %99s", cmd, arg1, arg2);
+    
     
     if (strcmp(cmd, "help") == 0 || strcmp(cmd, "h") == 0) {
         printf("Comandos disponíveis:\n");
@@ -85,7 +86,8 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
         show_topology(myNode);
     }else if (strcmp(cmd,"l")==0)
     {
-        leave(myNode,ip,port);
+        int fd = leave(myNode,ip,port);
+        return fd;
     }
     
 
@@ -104,7 +106,7 @@ int leave(NodeData *myNode, char *serverIp,int serverPort){
     ssize_t n;
     char buffer[BUFFER_SIZE];
 
-    
+
     fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
     if (fd == -1) /*error*/ exit(1);
 
@@ -130,11 +132,26 @@ int leave(NodeData *myNode, char *serverIp,int serverPort){
 
     buffer[n]='\0';
     //IMPRIMIR AQUI PARA DEBUG
-    printf("\t\t\t%s\n",buffer);
-    printf("flaginit = %d\n",myNode->flaginit);
+   
     close(fd);
+    
+    close(myNode->vzext.socket_fd);
+    printf("socket %d fechada\n",myNode->vzext.socket_fd);
 
-    return 0;
+    close(myNode->vzsalv.socket_fd);
+    printf("socket %d fechada\n",myNode->vzsalv.socket_fd);
+
+    for (int i = 0; i < myNode->numInternals; i++)
+    {   
+        if (myNode->intr[i].socket_fd != myNode->vzext.socket_fd)
+        {
+            close(myNode->intr[i].socket_fd);
+            printf("socket %d fechada\n",myNode->intr[i].socket_fd);    
+        }
+        
+    }
+    printf("Nó saiu da rede\n");
+    return -2;
 }
 
 
@@ -303,7 +320,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     - Descritor de socket da ligação estabelecida, ou -1 em caso de falha.
 */
 int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
-    // printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
+    printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
     ssize_t nleft,nwritten;
     char *ptr;
     if (strcmp(connectIP, "0.0.0.0") == 0 && myNode->flaginit == 0) {
@@ -370,9 +387,15 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
     - Nenhum.
 */
 void show_topology(NodeData *myNode) {
+    if (myNode->flaginit==1)
+    {
     printf("\n=== Topologia Atual ===\n");
     printf("ID: %s:%d\n", myNode->ip, myNode->tcp_port);
-    printf("Vizinho Externo: %s:%d\n", myNode->vzext.ip, myNode->vzext.tcp_port);
+    
+    printf("Vizinho Externo: %s:%d\n", 
+        strlen(myNode->vzext.ip) > 0 ? myNode->vzext.ip : "Não definido", 
+        myNode->vzext.tcp_port);
+
     printf("Vizinho de Salvaguarda: %s:%d\n", 
            strlen(myNode->vzsalv.ip) > 0 ? myNode->vzsalv.ip : "Não definido", 
            myNode->vzsalv.tcp_port);
@@ -382,4 +405,12 @@ void show_topology(NodeData *myNode) {
         printf("  %d. %s:%d\n", i+1, myNode->intr[i].ip, myNode->intr[i].tcp_port);
     }
     printf("=====================\n\n");
+    }else{
+        printf("=====================\n\n");
+        printf("Nó ainda não inicializado\n\n");
+        printf("=====================\n\n");
+    
+    }
+    
+    
 }

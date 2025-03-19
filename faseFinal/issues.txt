@@ -9,11 +9,13 @@ Cenas a fazer:
 
 	Implementar a saída de um nó da rede (leave) l 
 	CHECK -- Sair do servidor
+	Implementar as respostas dos outros nós
 	Começar a implementar objetos	
 
 Issues:
-	Para fechar as conexões com os vizinhos posso sair do programa ou tenho que dar close uma a uma??
 
 
 Resolvido:
+	Para fechar as conexões com os vizinhos posso sair do programa ou tenho que dar close uma a uma??
+
 

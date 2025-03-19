@@ -106,7 +106,8 @@ int main(int argc, char *argv[]) {
                     if (fgets(command, sizeof(command), stdin) != NULL) {
                         command[strcspn(command, "\n")] = '\0';  // Remover \n
                         int fd = handle_command(command, &my_node, reg_server_ip, reg_server_port);
-                        
+						printf("O valor de fd é %d, o valor de my_node.socket_listening é %d e o valor de my_node.flaginit é %d\n",fd,my_node.socket_listening,my_node.flaginit);
+
                         if(my_node.socket_listening!=-1 && my_node.flaginit==0){    
                             FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
                             my_node.flaginit=1;
@@ -114,12 +115,46 @@ int main(int argc, char *argv[]) {
                                 max_fd = my_node.socket_listening;
                             }
                         }
-                        if (fd != 0) {
+                        printf("Cheguei aqui LOL\n");
+                        if (fd != 0 && fd != -1 && fd != -2) {
                             FD_SET(fd, &master_fds);
                             if (max_fd < fd) {
                                 max_fd = fd;
                             }
                         }
+                        printf("O comando é %s\n",command);
+                        printf("O valor de fd é %d\n",fd);
+                        if (fd == -2) {
+
+                            printf("A limpar tudo\n");
+                            if (my_node.vzext.socket_fd >= 0) {
+                                FD_CLR(my_node.vzext.socket_fd, &master_fds);
+                                my_node.vzext.tcp_port = -1;
+                                my_node.vzext.socket_fd = -1;
+                                strcpy(my_node.vzext.ip,"");
+                            }
+                            printf("[%s]\n",my_node.vzsalv.ip);
+                            printf("fd -> %d\n",my_node.vzsalv.socket_fd);
+                            if (my_node.vzsalv.socket_fd >= 0) {
+                                FD_CLR(my_node.vzsalv.socket_fd, &master_fds);
+                                my_node.vzsalv.tcp_port = -1;
+                                my_node.vzsalv.socket_fd = -1;
+                                strcpy(my_node.vzsalv.ip,"");
+                                printf("[%s]\n",my_node.vzsalv.ip);
+                            }
+                            
+                            for (int i = 0; i < my_node.numInternals; i++) {
+                                if (my_node.intr[i].socket_fd >= 0) {
+                                    FD_CLR(my_node.intr[i].socket_fd, &master_fds);
+                                    my_node.intr[i].tcp_port = -1;
+                                    my_node.intr[i].socket_fd = -1;
+                                    my_node.intr[i].ip[0] = '\0';
+                                }
+                            } 
+
+                        my_node.numInternals = 0;
+                        }
+                        
                     }
                 }
                 
@@ -256,6 +291,7 @@ int main(int argc, char *argv[]) {
                                 strncpy(my_node.vzsalv.ip, ip, sizeof(my_node.vzsalv.ip) - 1);
                                 my_node.vzsalv.ip[sizeof(my_node.vzsalv.ip) - 1] = '\0';
                                 my_node.vzsalv.tcp_port = tcp_port;
+                                my_node.vzsalv.socket_fd = i;
                             }
                         }
                     message = next_message + 1;
