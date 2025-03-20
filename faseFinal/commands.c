@@ -106,7 +106,7 @@ int leave(NodeData *myNode, char *serverIp,int serverPort){
     ssize_t n;
     char buffer[BUFFER_SIZE];
 
-
+    if(strcmp(myNode->net,"xxx")!=0){
     fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
     if (fd == -1) /*error*/ exit(1);
 
@@ -134,7 +134,7 @@ int leave(NodeData *myNode, char *serverIp,int serverPort){
     //IMPRIMIR AQUI PARA DEBUG
    
     close(fd);
-    
+    }
     close(myNode->vzext.socket_fd);
     printf("socket %d fechada\n",myNode->vzext.socket_fd);
 

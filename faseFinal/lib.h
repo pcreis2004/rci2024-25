@@ -29,6 +29,8 @@ typedef struct {
     int currentCacheSize;
 } NodeData;
 
+int handleLeave(NodeData *mynode,int fdClosed);
+int cleanNeighboors(NodeData *my_node, fd_set *master_fds);
 int init_node(NodeData *myNode, int cache_size);
 int init_socket_listening(int port, char *ip);
 void free_node_memory(NodeData *myNode);

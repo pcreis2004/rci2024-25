@@ -11,6 +11,97 @@
 #include <time.h>
 #include "lib.h"
 
+int handleLeave(NodeData *mynode,int fdClosed){
+
+    if (fdClosed == mynode->vzext.socket_fd)
+    {
+        printf("Foi um vizinho externo, Tens que mandar um Entry para o de Salvaguarda e um Safe para todos os internos\n");
+        if (strcmp(mynode->vzsalv.ip,mynode->ip)==0 && mynode->vzsalv.tcp_port == mynode->tcp_port)
+        {
+            printf("CALMAAAAA\nO teu vizinho de Salvaguarda eras tu, ");
+
+            for (int i = 0; i < mynode->numInternals; i++)
+            {
+                if (fdClosed == mynode->intr[i].socket_fd)
+                {
+                    printf("era também um vizinho interno, remove-o da lista de internos,");
+                    mynode->numInternals--;
+                }
+                
+            }
+            if (mynode->numInternals!=0)
+            {
+                
+
+                printf(" vais ter que escolher um interno para se tornar o teu externo, mandar lhe entry e enviar SAfe para os outros internos\n");
+            }else{
+                printf("Como não tens internos tu és o teu próprio externo\n");
+            }
+            
+        }
+        
+
+    }else{
+
+        for (int i = 0; i < mynode->numInternals; i++)
+        {
+            if (fdClosed == mynode->intr[i].socket_fd)
+            {
+                printf("Foi um vizinho interno, remove-o só da lista de internos\n");
+            }
+            
+        }
+    }
+    
+
+
+    return 0;
+}
+
+int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
+    printf("A limpar tudo\n");
+
+    if (my_node->vzext.socket_fd >= 0) {
+        FD_CLR(my_node->vzext.socket_fd, master_fds);
+        my_node->vzext.tcp_port = -1;
+        my_node->vzext.socket_fd = -1;
+        strcpy(my_node->vzext.ip, "");
+    }
+
+    if (my_node->vzsalv.socket_fd >= 0) {
+        FD_CLR(my_node->vzsalv.socket_fd, master_fds);
+        my_node->vzsalv.tcp_port = -1;
+        my_node->vzsalv.socket_fd = -1;
+        strcpy(my_node->vzsalv.ip, "");
+    }
+
+    for (int i = 0; i < my_node->numInternals; i++) {
+        if (my_node->intr[i].socket_fd >= 0) {
+            FD_CLR(my_node->intr[i].socket_fd, master_fds);
+            my_node->intr[i].tcp_port = -1;
+            my_node->intr[i].socket_fd = -1;
+            my_node->intr[i].ip[0] = '\0';
+        }
+    }
+
+    my_node->numInternals = 0;
+
+    // Recalcular max_fd
+    int new_max_fd = STDIN_FILENO;
+    for (int i = 0; i < FD_SETSIZE; i++) {
+        if (FD_ISSET(i, master_fds)) {
+            new_max_fd = i;
+
+        }
+    }
+    // printf("O novo max fd é %d e o fd da socket de listening é %d",new_max_fd,my_node->socket_listening);
+    return new_max_fd;
+}
+
+
+
+
+
 /* Função: init_node
    Inicializa a estrutura de dados de um nó da rede com as suas variáveis internas,
    cache, lista de objetos e socket de escuta.
