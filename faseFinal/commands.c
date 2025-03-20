@@ -239,14 +239,6 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
         if(n == -1) /*error*/ exit(1);
 
         n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
-
-    //     buffer[n]='\0';
-    // if (strcmp(buffer,"OKREG")==0)
-    // {
-    //     printf("»»%s\n",buffer);
-    // }else{
-    //     printf("Fora daquele nó estranho %s\n",buffer);
-    // }
         // Store the selected IP and port in variables
         // (You might want to modify the function parameters to pass these back)
         // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
