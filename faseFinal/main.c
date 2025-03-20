@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
                     if (n <= 0) {
                         if (n == 0) {
                             printf("Conexão fechada no FD %d\n", i);
-                            if (handleLeave(&my_node,i)!=0)
+                            if (handleLeave(&my_node,i,&master_fds)!=0)
                             {
                                 perror("handle leave");
                                 exit(1);

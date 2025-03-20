@@ -394,7 +394,14 @@ void show_topology(NodeData *myNode) {
     
     printf("Vizinhos Internos (%d):\n", myNode->numInternals);
     for (int i = 0; i < myNode->numInternals; i++) {
-        printf("  %d. %s:%d\n", i+1, myNode->intr[i].ip, myNode->intr[i].tcp_port);
+        if (myNode->intr[i].socket_fd != -1)
+        {
+            printf("  %d. %s:%d\n", i+1, myNode->intr[i].ip, myNode->intr[i].tcp_port);
+        }else{
+            myNode->numInternals--;
+
+        }
+        
     }
     printf("=====================\n\n");
     }else{
