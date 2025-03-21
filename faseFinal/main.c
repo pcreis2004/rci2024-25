@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
                     if (n <= 0) {
                         if (n == 0) {
                             printf("Conexão fechada no FD %d\n", i);
-                            if (handleLeave(&my_node,i,&master_fds)!=0)
+                            if (handleLeave(&my_node,i,&master_fds,&max_fd)!=0)
                             {
                                 perror("handle leave");
                                 exit(1);
@@ -209,6 +209,7 @@ int main(int argc, char *argv[]) {
                                       
                                     ptr=safe_msg;
                                     nleft=strlen(safe_msg);
+                                    printf("Enviar para a socket %d que é um nó interno %s:%d e agora é o externo a mensagem --> %s",i,my_node.vzext.ip,my_node.vzext.tcp_port,safe_msg);
                                     
                                     while (nleft>0)
                                     {
@@ -241,7 +242,7 @@ int main(int argc, char *argv[]) {
                                     ssize_t nleft,nwritten;       
                                     // Enviar mensagem SAFE com o vizinho externo
                                     char safe_msg[BUFFER_SIZE],*ptr;
-
+                                    printf("Enviar para a socket %d que é um nó interno %s:%d e agora é o externo a mensagem --> %s",i,my_node.vzext.ip,my_node.vzext.tcp_port,safe_msg);
                                     snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
                                             my_node.vzext.ip, my_node.vzext.tcp_port);
                                             
