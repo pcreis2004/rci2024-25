@@ -11,7 +11,7 @@
 #include <time.h>
 #include "lib.h"
 
-int handleLeave(NodeData *mynode, int fdClosed, fd_set *master_fds) {
+int handleLeaveAntigo(NodeData *mynode, int fdClosed, fd_set *master_fds) {
     // Check if the closed connection was with the external neighbor
     if (fdClosed == mynode->vzext.socket_fd) {
         printf("External neighbor disconnected. Need to connect to safeguard node and update topology.\n");
@@ -50,7 +50,7 @@ int handleLeave(NodeData *mynode, int fdClosed, fd_set *master_fds) {
                 mynode->vzext.tcp_port = mynode->intr[random_index].tcp_port;
                 mynode->vzext.socket_fd = mynode->intr[random_index].socket_fd;
                 strcpy(mynode->vzext.ip, mynode->intr[random_index].ip);
-                mynode->vzext.safe_sent = mynode->intr[random_index].safe_sent;
+                mynode->vzext.safe_sent = 0;
                 
                 // Remove this neighbor from the internal list
                 for (int j = random_index; j < mynode->numInternals - 1; j++) {
@@ -108,14 +108,23 @@ int handleLeave(NodeData *mynode, int fdClosed, fd_set *master_fds) {
             mynode->vzext.safe_sent = 0;
             
             // Send ENTRY message to the new external neighbor (safeguard)
-            char entry_msg[BUFFER_SIZE];
-            snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", mynode->ip, mynode->tcp_port);
-            
-            if (send_message(new_sock, entry_msg) < 0) {
-                printf("Failed to send ENTRY message to safeguard node.\n");
-                return -1;
-            }
-            
+            ssize_t nleft,nwritten;
+                char *ptr;
+                char entry_msg[BUFFER_SIZE];
+                
+                snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", mynode->ip, mynode->tcp_port);
+                
+                ptr=entry_msg;
+                nleft=strlen(entry_msg);
+                
+                while (nleft>0)
+                {
+                    nwritten=write(mynode->vzext.socket_fd,ptr,nleft);
+                    if(nwritten<=0)/*error*/exit(1);
+                    nleft-=nwritten;
+                    ptr+=nwritten;
+                }
+            printf("Mensagem enviada para o nó %s:%d --- > %s",mynode->vzsalv.ip,mynode->vzsalv.tcp_port,entry_msg);
             // Send SAFE messages to all internal neighbors
             printf("Sending SAFE messages to all internal neighbors.\n");
             char safe_msg[BUFFER_SIZE];
@@ -161,6 +170,7 @@ int send_message(int sockfd, const char *message) {
         nwritten = write(sockfd, ptr, nleft);
         if (nwritten <= 0) {
             // Handle error
+            perror("DEU MERDA");
             return -1;
         }
         nleft -= nwritten;
@@ -171,7 +181,7 @@ int send_message(int sockfd, const char *message) {
 }
 
 
-int handleLeaveAntigo(NodeData *mynode,int fdClosed, fd_set *master_fds){
+int handleLeave(NodeData *mynode,int fdClosed, fd_set *master_fds){
 
     if (fdClosed == mynode->vzext.socket_fd)
     {
