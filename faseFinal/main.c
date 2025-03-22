@@ -152,6 +152,20 @@ int main(int argc, char *argv[]) {
                     if (n <= 0) {
                         if (n == 0) {
                             printf("Conexão fechada no FD %d\n", i);
+                            close(i);
+                            FD_CLR(i, &master_fds);
+
+                            int new_max_fd = STDIN_FILENO;
+                            
+                            for (int i = 0; i < FD_SETSIZE; i++) {
+                                if (FD_ISSET(i, &master_fds)) {
+                                    new_max_fd = i;
+                    
+                                }
+                            }
+                            
+                            max_fd=new_max_fd;
+                            
                             if (handleLeave(&my_node,i,&master_fds,&max_fd)!=0)
                             {
                                 perror("handle leave");
@@ -162,8 +176,6 @@ int main(int argc, char *argv[]) {
                         } else {
                             perror("read");
                         }
-                        close(i);
-                        FD_CLR(i, &master_fds);
                     } else {
                         buffer[n] = '\0';  // Garantir terminação da string
 

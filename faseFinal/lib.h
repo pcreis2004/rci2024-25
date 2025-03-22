@@ -20,7 +20,8 @@ typedef struct {
     NodeID vzext;          // Vizinho externo
     NodeID vzsalv;         // Vizinho de salvaguarda
     NodeID *intr;          // Lista de vizinhos internos
-    int numInternals;      // Número atual de vizinhos internos
+    int numInternals;      // Número máximo de vizinhos internos que já tivemos
+    int numInternalsReal;  // Número real de vizinhos internos
     int capacityInternals; // Capacidade alocada para vizinhos internos
     char **objects;        // Lista de objetos armazenados
     int numObjects;

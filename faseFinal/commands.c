@@ -392,16 +392,17 @@ void show_topology(NodeData *myNode) {
            strlen(myNode->vzsalv.ip) > 0 ? myNode->vzsalv.ip : "Não definido", 
            myNode->vzsalv.tcp_port);
     
-    printf("Vizinhos Internos (%d):\n", myNode->numInternals);
-    for (int i = 0; i < myNode->numInternals; i++) {
-        if (myNode->intr[i].socket_fd != -1)
-        {
-            printf("  %d. %s:%d\n", i+1, myNode->intr[i].ip, myNode->intr[i].tcp_port);
-        }else{
-            myNode->numInternals--;
-
-        }
+    printf("Vizinhos Internos (%d):\n", myNode->numInternalsReal);
+    if (myNode->numInternalsReal!=0)
+    {
         
+        for (int i = 0; i < myNode->numInternals; i++) {
+            if (myNode->intr[i].socket_fd != -1)
+            {
+                printf("  %d. %s:%d\n", i+1, myNode->intr[i].ip, myNode->intr[i].tcp_port);
+            }
+            
+        }
     }
     printf("=====================\n\n");
     }else{
