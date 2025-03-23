@@ -9,221 +9,132 @@
 #include <arpa/inet.h>
 #include <sys/time.h>  
 #include <time.h>
+#include <stdbool.h>
 #include "lib.h"
 
-
-int handleLeave(NodeData *mynode,int fdClosed, fd_set *master_fds, int *max_fd){
-
-    if (fdClosed == mynode->vzext.socket_fd)
-    {
-        printf("Foi um vizinho externo, Tens que mandar um Entry para o de Salvaguarda e um Safe para todos os internos\n");
-
-        //Vamos verificar se somos o nó de salvaguarda de nós próp
-        if (strcmp(mynode->vzsalv.ip,mynode->ip)==0 && mynode->vzsalv.tcp_port == mynode->tcp_port)
-        {
-            printf("CALMAAAAA\nO teu vizinho de Salvaguarda eras tu próprio ");
+int handleLeave(NodeData *mynode, int fdClosed, fd_set *master_fds, int *max_fd) {
+    // Verificar se foi o externo
+    if (fdClosed == mynode->vzext.socket_fd) {
+        printf("Foi um vizinho externo, tens que mandar um ENTRY para o de Salvaguarda e um SAFE para todos os internos\n");
+        
+        // Verificar se somos o nó de salvaguarda de nós próprios
+        if (strcmp(mynode->vzsalv.ip, mynode->ip) == 0 && mynode->vzsalv.tcp_port == mynode->tcp_port) {
+            printf("CALMAAAAA\nO teu vizinho de Salvaguarda eras tu próprio\n");
             
-            //Verificar se o nó externo que foi saiu tbm era interno
-            for (int i = 0; i < mynode->numInternals; i++)
-            {
-                if (fdClosed == mynode->intr[i].socket_fd)
-                {
-                    printf("era também um vizinho interno, remove-o da lista de internos,");
-                    //remove intr
+            // Verificar se o nó externo que saiu também era interno
+            removeInternal(mynode, fdClosed);
 
-                    printf("Vizinho %d removido\n",mynode->intr[i].tcp_port);
-                    mynode->intr[i].tcp_port = -1;
-                    mynode->intr[i].socket_fd = -1;
-                    mynode->intr[i].ip[0] = '\0';
-                    mynode->numInternalsReal--;
-                }
-                
-            }
-
-            //Verificar se ainda tens internos
-            if (mynode->numInternalsReal!=0)
-            {
-                
-                printf(" vais ter que escolher um interno para se tornar o teu externo, mandar lhe entry e enviar SAfe para os outros internos\n");
-                //random interno
-
-                srand(time(NULL));
-                int random_index = rand() % mynode->numInternals;
-                while (mynode->intr[random_index].socket_fd==-1)
-                {
-                    random_index = rand() % mynode->numInternals;
-                }
-
-                printf("O random Index é %d e a sua socket é %d\n",random_index,mynode->intr[random_index].socket_fd);
-                mynode->vzext.tcp_port = mynode->intr[random_index].tcp_port;
-                strcpy(mynode->vzext.ip,mynode->intr[random_index].ip);
-                mynode->vzext.safe_sent=mynode->intr[random_index].safe_sent;
-                printf("O novo externo é %s:%d\n",mynode->vzext.ip,mynode->vzext.tcp_port);
-                // Enviar mensagem ENTRY
-                
-
-                //Possível problema aqui
-                // int sockfd = connect_to_node(mynode->vzext.ip, mynode->vzext.tcp_port);
-                // if (sockfd < 0) {
-                //     printf("Falha ao conectar a %s:%d\n", mynode->vzext.ip, mynode->vzext.tcp_port);
-                //     return -1;
-                // }
-
-                // mynode->vzext.socket_fd = sockfd;
-                mynode->vzext.socket_fd = mynode->intr[random_index].socket_fd;
-
-                
-
-                ssize_t nleft,nwritten;
-                char *ptr;
-                char entry_msg[BUFFER_SIZE];
-                
-                snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", mynode->ip, mynode->tcp_port);
-                
-                ptr=entry_msg;
-                nleft=strlen(entry_msg);
-                
-                while (nleft>0)
-                {
-                    nwritten=write(mynode->vzext.socket_fd,ptr,nleft);
-                    if(nwritten<=0)/*error*/exit(1);
-                    nleft-=nwritten;
-                    ptr+=nwritten;
-                }
-                 FD_SET(mynode->vzext.socket_fd, master_fds);
-        
-                int new_max_fd = STDIN_FILENO;
-                for (int i = 0; i < FD_SETSIZE; i++) {
-                    if (FD_ISSET(i, master_fds)) {
-                        new_max_fd = i;
-        
-                    }
-                }
-                *max_fd=new_max_fd;
-
-                printf("Enviar Safe para todos os nós internos\n");
-
-                for (int i = 0; i < mynode->numInternals; i++)
-                {
-                    if (/*mynode->intr[i].socket_fd != mynode->vzext.socket_fd && */mynode->intr[i].socket_fd != -1)
-                    {
-                        ssize_t nleft,nwritten;
-                        char *ptr;
-                        char safe_msg[BUFFER_SIZE];
-                        
-                        snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", mynode->vzext.ip, mynode->vzext.tcp_port);
-                        
-                        ptr=safe_msg;
-                        nleft=strlen(safe_msg);
-                        
-                        while (nleft>0)
-                        {
-                            nwritten=write(mynode->intr[i].socket_fd,ptr,nleft);
-                            if(nwritten<=0)/*error*/exit(1);
-                            nleft-=nwritten;
-                            ptr+=nwritten;
-                        }
-                    }
-                    
-                }
-                
-                
-                printf("Vou sair");
-                return 0;
-                
-            }else{
+            // Verificar se ainda tens internos
+            if (mynode->numInternalsReal > 0) {
+                promoteRandomInternalToExternal(mynode, master_fds, max_fd);
+                sendSafeToAllInternals(mynode);
+            } else {
                 printf("Como não tens internos tu és o teu próprio externo\n");
-                //EXTERNO == teu id
-                cleanNeighboors(mynode,master_fds);
+                cleanNeighboors(mynode, master_fds);
                 return 0;
             }
-            
+        } else {
+            //Se não for um nó de salvaguarda de nós próprios enviar Entry para o de salvaguarda e Safe para todos os internos
+            return fallbackToSafeguard(mynode, master_fds, max_fd);
         }
-        
-        //mandar entry para o de salvaguarda e safe aos internos 
-        int sockfd = connect_to_node(mynode->vzsalv.ip, mynode->vzsalv.tcp_port);
-        if (sockfd < 0) {
-            printf("Falha ao conectar a %s:%d\n", mynode->vzsalv.ip, mynode->vzext.tcp_port);
-            return -1;
-        }
-        mynode->vzext.socket_fd=sockfd;
-        strcpy(mynode->vzext.ip,mynode->vzsalv.ip);
-        mynode->vzext.tcp_port=mynode->vzsalv.tcp_port;
-
-        
-        printf("Enviar Safe para todos os nós internos\n");
-        for (int i = 0; i < mynode->numInternals; i++)
-        {
-            if (mynode->intr[i].socket_fd != mynode->vzext.socket_fd && mynode->intr[i].socket_fd != -1)
-            {
-                ssize_t nleft,nwritten;
-                char *ptr;
-                char safe_msg[BUFFER_SIZE];
-                
-                snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", mynode->vzext.ip, mynode->vzext.tcp_port);
-                
-                ptr=safe_msg;
-                nleft=strlen(safe_msg);
-                
-                while (nleft>0)
-                {
-                    nwritten=write(mynode->intr[i].socket_fd,ptr,nleft);
-                    if(nwritten<=0)/*error*/exit(1);
-                    nleft-=nwritten;
-                    ptr+=nwritten;
-                }
-            }
-            
-        }
-        ssize_t nleft,nwritten;
-        char *ptr;
-        char entry_msg[BUFFER_SIZE];
-
-        snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", mynode->ip, mynode->tcp_port);
-        printf("Enviar para a socket %d que era o nó de salvaguarda %s:%d e agora é o externo a mensagem --> %s",sockfd,mynode->vzext.ip,mynode->vzext.tcp_port,entry_msg);
-        ptr=entry_msg;
-        nleft=strlen(entry_msg);
-        
-        while (nleft>0)
-        {
-            nwritten=write(mynode->vzext.socket_fd,ptr,nleft);
-            if(nwritten<=0)/*error*/exit(1);
-            nleft-=nwritten;
-            ptr+=nwritten;
-        }
-        FD_SET(mynode->vzext.socket_fd, master_fds);
-
-        int new_max_fd = STDIN_FILENO;
-        for (int i = 0; i < FD_SETSIZE; i++) {
-            if (FD_ISSET(i, master_fds)) {
-                new_max_fd = i;
-
-            }
-        }
-        *max_fd=new_max_fd;
-
-    
-    }else{
-
-        for (int i = 0; i < mynode->numInternals; i++)
-        {
-            if (fdClosed == mynode->intr[i].socket_fd)
-            {
-                printf("Foi um vizinho interno, remove-o só da lista de internos\n");
-
-                mynode->intr[i].tcp_port = -1;
-                mynode->intr[i].socket_fd = -1;
-                mynode->intr[i].ip[0] = '\0';
-                mynode->numInternalsReal--;
-            }
-            
-        }
+    } else {
+        //Foi um vizinho interno
+        removeInternal(mynode, fdClosed);
     }
-    
-
 
     return 0;
 }
+
+
+void removeInternal(NodeData *mynode, int fdClosed) {
+    for (int i = 0; i < 10; i++) {
+        if (fdClosed == mynode->intr[i].socket_fd) {
+            printf("Foi um vizinho interno, remove-o só da lista de internos\n");
+            mynode->intr[i].tcp_port = -1;
+            mynode->intr[i].socket_fd = -1;
+            mynode->intr[i].ip[0] = '\0';
+            mynode->numInternalsReal--;
+        }
+    }
+}
+
+void promoteRandomInternalToExternal(NodeData *mynode, fd_set *master_fds, int *max_fd) {
+    srand(time(NULL));
+    int i;
+    do {
+        i = rand() % mynode->numInternals;
+    } while (mynode->intr[i].socket_fd == -1);
+
+    mynode->vzext = mynode->intr[i];
+
+    sendEntryMessage(mynode, mynode->vzext.socket_fd);
+    FD_SET(mynode->vzext.socket_fd, master_fds);
+
+    updateMaxFD(master_fds, max_fd);
+    printf("Promovido interno %d a externo.\n", mynode->vzext.tcp_port);
+}
+
+int fallbackToSafeguard(NodeData *mynode, fd_set *master_fds, int *max_fd) {
+    int sockfd = connect_to_node(mynode->vzsalv.ip, mynode->vzsalv.tcp_port);
+    if (sockfd < 0) {
+        printf("Falha ao conectar a %s:%d\n", mynode->vzsalv.ip, mynode->vzsalv.tcp_port);
+        return -1;
+    }
+
+    mynode->vzext.socket_fd = sockfd;
+    strcpy(mynode->vzext.ip, mynode->vzsalv.ip);
+    mynode->vzext.tcp_port = mynode->vzsalv.tcp_port;
+
+    sendEntryMessage(mynode, sockfd);
+    FD_SET(sockfd, master_fds);
+    updateMaxFD(master_fds, max_fd);
+    sendSafeToAllInternals(mynode);
+    return 0;
+}
+
+void sendEntryMessage(NodeData *mynode, int socket_fd) {
+    char entry_msg[BUFFER_SIZE];
+    snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", mynode->ip, mynode->tcp_port);
+    writeFull(socket_fd, entry_msg);
+    printf("ENTRY enviado para %s:%d\n", mynode->vzext.ip, mynode->vzext.tcp_port);
+}
+
+void sendSafeToAllInternals(NodeData *mynode) {
+    char safe_msg[BUFFER_SIZE];
+    snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", mynode->vzext.ip, mynode->vzext.tcp_port);
+
+    for (int i = 0; i < mynode->numInternals; i++) {
+        if (mynode->intr[i].socket_fd != -1) {
+            writeFull(mynode->intr[i].socket_fd, safe_msg);
+        }
+    }
+    printf("SAFE enviado a todos os internos\n");
+}
+
+void writeFull(int socket_fd, const char *msg) {
+    ssize_t nleft = strlen(msg), nwritten;
+    const char *ptr = msg;
+    while (nleft > 0) {
+        nwritten = write(socket_fd, ptr, nleft);
+        if (nwritten <= 0) {
+            perror("Erro ao escrever");
+            exit(1);
+        }
+        nleft -= nwritten;
+        ptr += nwritten;
+    }
+}
+
+void updateMaxFD(fd_set *master_fds, int *max_fd) {
+    *max_fd = STDIN_FILENO;
+    for (int i = 0; i < FD_SETSIZE; i++) {
+        if (FD_ISSET(i, master_fds) && i > *max_fd) {
+            *max_fd = i;
+        }
+    }
+}
+
+
 
 
 int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
@@ -244,7 +155,7 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
     }
 
     for (int i = 0; i < my_node->numInternals; i++) {
-        if (my_node->intr[i].socket_fd >= 0) {
+        if (my_node->intr[i].socket_fd != -1) {
             FD_CLR(my_node->intr[i].socket_fd, master_fds);
             my_node->intr[i].tcp_port = -1;
             my_node->intr[i].socket_fd = -1;
@@ -254,7 +165,7 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
     }
 
     my_node->numInternals = 0;
-
+    my_node->numInternalsReal = 0;
     // Recalcular max_fd
     int new_max_fd = STDIN_FILENO;
     for (int i = 0; i < FD_SETSIZE; i++) {
@@ -295,12 +206,15 @@ int init_node(NodeData *myNode, int cache_size) {
     myNode->vzsalv.safe_sent=0;
     // Inicializar lista de vizinhos internos
     myNode->intr = malloc(10 * sizeof(NodeID));  // Capacidade inicial
-    for (int i = 0; i < myNode->numInternals; i++)
+    printf("o número de vizinhos internos é %d\n",myNode->numInternals);
+    printf("o número de vizinhos internos reais é %d\n",myNode->numInternalsReal);
+    for (int i = 0; i < 10; i++)
     {
         myNode->intr[i].tcp_port = -1;
         myNode->intr[i].socket_fd = -1;
         myNode->intr[i].safe_sent = 0;
         myNode->intr[i].ip[0] = '\0';
+        printf("vizinho interno nº %d inicializado\n",i);
     }
     
     myNode->numInternals = 0;
@@ -495,8 +409,7 @@ int connect_to_node(char *ip, int port) {
 void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
     // Verificar se já temos esse vizinho
     for (int i = 0; i < myNode->numInternals; i++) {
-        if (strcmp(myNode->intr[i].ip, neighbor.ip) == 0 && 
-            myNode->intr[i].tcp_port == neighbor.tcp_port) {
+        if (strcmp(myNode->intr[i].ip, neighbor.ip) == 0 && myNode->intr[i].tcp_port == neighbor.tcp_port) {
             printf("Vizinho %s:%d já existe na lista\n", neighbor.ip, neighbor.tcp_port);
             return;
         }
@@ -522,5 +435,5 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
     }
     
     
-    // printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
+    printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
 }

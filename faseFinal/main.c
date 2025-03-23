@@ -31,6 +31,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>  
 #include <time.h>
+#include <stdbool.h>
 
 # include "lib.h"
 # include "commands.h"
@@ -69,9 +70,6 @@ int main(int argc, char *argv[]) {
     printf("Configuração:\n Cache: %d\n IP: %s\n TCP: %d\n RegIP: %s\n RegUDP: %d\n",
            cache_size, my_node.ip, my_node.tcp_port, reg_server_ip, reg_server_port);
 
-    // printf("Inicializando nó...\n");
-
-    //init_node(&my_node, cache_size, reg_server_ip, reg_server_port);
 
     printf("NDN Node started. Enter commands:\n\n");
 

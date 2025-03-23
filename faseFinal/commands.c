@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>  
 #include <time.h>
+#include <stdbool.h>
 
 #include "commands.h"
 #include "lib.h"
@@ -284,16 +285,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
 
     // printf("Estou aqui seu boi do caralho\n");
     buffer[n]='\0';
-    // if (strcmp(buffer,"OKREG")==0)
-    // {
-    //     printf("»»%s\n",buffer);
-    // }else{
-    //     printf("Fora daquele nó estranho %s\n",buffer);
-    // }
-    // printf("");
-    // Store the selected IP and port in variables
-    // (You might want to modify the function parameters to pass these back)
-    // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
+    
     freeaddrinfo(res);
 
     close(fd);
@@ -393,17 +385,17 @@ void show_topology(NodeData *myNode) {
            myNode->vzsalv.tcp_port);
     
     printf("Vizinhos Internos (%d):\n", myNode->numInternalsReal);
-    if (myNode->numInternalsReal!=0)
-    {
-        
-        for (int i = 0; i < myNode->numInternals; i++) {
-            if (myNode->intr[i].socket_fd != -1)
+    
+        int nInterno = 1;
+        for (int i = 0; i < 10; i++) {
+            if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].tcp_port > 0)
             {
-                printf("  %d. %s:%d\n", i+1, myNode->intr[i].ip, myNode->intr[i].tcp_port);
+                printf("  %d. %s:%d\n", nInterno, myNode->intr[i].ip, myNode->intr[i].tcp_port);
+                nInterno++;
             }
-            
         }
-    }
+        
+    
     printf("=====================\n\n");
     }else{
         printf("=====================\n\n");

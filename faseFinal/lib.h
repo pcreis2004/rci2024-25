@@ -31,7 +31,13 @@ typedef struct {
 } NodeData;
 
 int handleLeave(NodeData *mynode,int fdClosed, fd_set *master_fds,int *max_fd);
-int send_message(int sockfd, const char *message);
+void removeInternal(NodeData *mynode, int fdClosed);
+void promoteRandomInternalToExternal(NodeData *mynode, fd_set *master_fds, int *max_fd);
+int fallbackToSafeguard(NodeData *mynode, fd_set *master_fds, int *max_fd);
+void sendEntryMessage(NodeData *mynode, int socket_fd);
+void sendSafeToAllInternals(NodeData *mynode);
+void writeFull(int socket_fd, const char *msg);
+void updateMaxFD(fd_set *master_fds, int *max_fd);
 int cleanNeighboors(NodeData *my_node, fd_set *master_fds);
 int init_node(NodeData *myNode, int cache_size);
 int init_socket_listening(int port, char *ip);
