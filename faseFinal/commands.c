@@ -79,7 +79,17 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     else if (strcmp(cmd,"j")==0)
     {
         int fd = join(arg1,ip,port,myNode,myNode->cacheSize);
-        strcpy(myNode->net,arg1);
+        if (fd!=0)
+        {
+            strcpy(myNode->net,arg1);
+            if (fd==-1)
+            {
+                fd=0;
+            }
+            
+        }
+    
+        
         return fd;
     }
     
@@ -98,7 +108,16 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     }
     return 0;
 }
-
+/* Função: leave
+   Responsável por remover o nó da rede NDN, enviando uma mensagem UNREG ao servidor de registo
+   e fechando todos os sockets abertos (externo, salvaguarda e internos).
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+    - serverIp: endereço IP do servidor de registo.
+    - serverPort: porto do servidor de registo.
+   Retorno:
+    - -2 indicando que o nó saiu da rede com sucesso.
+*/
 int leave(NodeData *myNode, char *serverIp,int serverPort){
     socklen_t addrlen;
     struct sockaddr addr;
@@ -152,9 +171,52 @@ int leave(NodeData *myNode, char *serverIp,int serverPort){
         
     }
     printf("Nó saiu da rede\n");
+    strcpy(myNode->net, "xxx");
+
     return -2;
 }
+/* Função: handleLeave
+   Processa o evento de saída de um vizinho (nó externo ou interno), atualizando a estrutura
+   do nó conforme necessário (promovendo internos ou ativando o nó de salvaguarda).
+   Parâmetros:
+    - mynode: ponteiro para a estrutura NodeData do nó atual.
+    - fdClosed: descritor do socket que foi fechado.
+    - master_fds: conjunto de descritores gerido pelo select.
+    - max_fd: ponteiro para o maior descritor de ficheiro atual.
+   Retorno:
+    - 0 em caso de processamento normal.
+    - Resultado de fallbackToSafeguard, se aplicável.
+*/
+int handleLeave(NodeData *mynode, int fdClosed, fd_set *master_fds, int *max_fd) {
+    printf("A procesar o leave\n");
+    // Verificar se foi o externo
+    if (fdClosed == mynode->vzext.socket_fd) {
+        
+        // Verificar se somos o nó de salvaguarda de nós próprios
+        if (strcmp(mynode->vzsalv.ip, mynode->ip) == 0 && mynode->vzsalv.tcp_port == mynode->tcp_port) {
+            
+            // Verificar se o nó externo que saiu também era interno
+            removeInternal(mynode, fdClosed);
 
+            // Verificar se ainda tens internos
+            if (mynode->numInternalsReal > 0) {
+                promoteRandomInternalToExternal(mynode, master_fds, max_fd);
+                sendSafeToAllInternals(mynode);
+            } else {
+                cleanNeighboors(mynode, master_fds);
+                return 0;
+            }
+        } else {
+            //Se não for um nó de salvaguarda de nós próprios enviar Entry para o de salvaguarda e Safe para todos os internos
+            return fallbackToSafeguard(mynode, master_fds, max_fd);
+        }
+    } else {
+        //Foi um vizinho interno
+        removeInternal(mynode, fdClosed);
+    }
+
+    return 0;
+}
 
 
 /* Função: join
@@ -187,109 +249,116 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     }
     
 
-
-    fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
-    if (fd == -1) /*error*/ exit(1);
+    if (strcmp(myNode->net,"xxx")==0)
+    {
+        
+        fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
+        if (fd == -1) /*error*/ exit(1);
+        
+        memset(&hints, 0, sizeof hints);
+        hints.ai_family = AF_INET; // IPv4
+        hints.ai_socktype = SOCK_DGRAM; // UDP socket
+        
+        char buffer[1024]; // Increased buffer size to handle multiple lines
+        sprintf(buffer, "%d", port);
+        
+        errcode = getaddrinfo(ip, buffer, &hints, &res);
+        if (errcode != 0) return -1;
+        
+        char mensagem[20];
+        snprintf(mensagem, sizeof(mensagem), "NODES %s\n", net);
+        
+        n = sendto(fd, mensagem, strlen(mensagem), 0, res->ai_addr, res->ai_addrlen);
+        if (n == -1) /*error*/ exit(1);
+        
+        addrlen = sizeof(addr);
+        n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
+        if (n == -1) return -1;
+        
+        buffer[n] = '\0';
+        printf("Nó connectado à net %s\n", net);
+        
+        // Parse the response to get IP addresses and ports
+        char *line = strtok(buffer, "\n");
+        
+        // Skip first line (NODESLIST 100)
+        if (line != NULL) {
+            line = strtok(NULL, "\n");
+        }
+        
+        // Count how many servers we have
+        int server_count = 0;
+        char *servers[100]; // Assuming maximum 100 servers
+        
+        while (line != NULL && server_count < 100) {
+            servers[server_count++] = line;
+            line = strtok(NULL, "\n");
+        }
+        // If no servers available, return error
+        if (server_count == 0) {
+            char msgServer[BUFFER_SIZE];
+            snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
+            // printf("A mensagem enviada foi %s", msgServer);
+            n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
+            // printf("Nó registado no servidor\n");
+            if(n == -1) /*error*/ exit(1);
     
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET; // IPv4
-    hints.ai_socktype = SOCK_DGRAM; // UDP socket
+            n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
+            // Store the selected IP and port in variables
+            // (You might want to modify the function parameters to pass these back)
+            // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
+            close(fd);
+            return -1;
+        }
+        
+        // Choose a random server
+        srand(time(NULL));
+        int random_index = rand() % server_count;
+        char selected_server[128];
+        strcpy(selected_server, servers[random_index]);
+        
+        // Extract IP and port from the selected server
+        char selected_ip[64];
+        int selected_port;
+        sscanf(selected_server, "%s %d", selected_ip, &selected_port);
+        
+        // printf("Randomly selected server: %s:%d\n", selected_ip, selected_port);
     
-    char buffer[1024]; // Increased buffer size to handle multiple lines
-    sprintf(buffer, "%d", port);
+        myNode->flaginit=1;
+        int filed = djoin(myNode,selected_ip,selected_port,myNode->cacheSize);
+        if (filed==-1)
+        {
+            printf("upssss");
+            strcpy(myNode->net,"xxx");
+            myNode->flaginit=0;
+            close(fd);
+            close(filed);
+            freeaddrinfo(res);
+            return 0;
+        }
+        myNode->flaginit=0;
     
-    errcode = getaddrinfo(ip, buffer, &hints, &res);
-    if (errcode != 0) return -1;
-    
-    char mensagem[20];
-    snprintf(mensagem, sizeof(mensagem), "NODES %s\n", net);
-    
-    n = sendto(fd, mensagem, strlen(mensagem), 0, res->ai_addr, res->ai_addrlen);
-    if (n == -1) /*error*/ exit(1);
-    
-    addrlen = sizeof(addr);
-    n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
-    if (n == -1) return -1;
-    
-    buffer[n] = '\0';
-    printf("Nó connectado à net %s\n", net);
-    
-    // Parse the response to get IP addresses and ports
-    char *line = strtok(buffer, "\n");
-    
-    // Skip first line (NODESLIST 100)
-    if (line != NULL) {
-        line = strtok(NULL, "\n");
-    }
-    
-    // Count how many servers we have
-    int server_count = 0;
-    char *servers[100]; // Assuming maximum 100 servers
-    
-    while (line != NULL && server_count < 100) {
-        servers[server_count++] = line;
-        line = strtok(NULL, "\n");
-    }
-    // If no servers available, return error
-    if (server_count == 0) {
+        // printf("o file descas é este lol [%d]\n",filed);
         char msgServer[BUFFER_SIZE];
         snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
-        // printf("A mensagem enviada foi %s", msgServer);
         n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
         // printf("Nó registado no servidor\n");
-        if(n == -1) /*error*/ exit(1);
-
+        if (n == -1) /*error*/ exit(1);
+        printf("Nó registado na net %s\n\n", net);
+    
         n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
-        // Store the selected IP and port in variables
-        // (You might want to modify the function parameters to pass these back)
-        // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
-        close(fd);
-        return 0;
-    }
+        if (n == -1) return -1;
     
-    // Choose a random server
-    srand(time(NULL));
-    int random_index = rand() % server_count;
-    char selected_server[128];
-    strcpy(selected_server, servers[random_index]);
-    
-    // Extract IP and port from the selected server
-    char selected_ip[64];
-    int selected_port;
-    sscanf(selected_server, "%s %d", selected_ip, &selected_port);
-    
-    // printf("Randomly selected server: %s:%d\n", selected_ip, selected_port);
-
-    myNode->flaginit=1;
-    int filed = djoin(myNode,selected_ip,selected_port,myNode->cacheSize);
-    if (filed==-1)
-    {
-        myNode->flaginit=0;
-        close(fd);
-        close(filed);
+        // printf("Estou aqui seu boi do caralho\n");
+        buffer[n]='\0';
+        
         freeaddrinfo(res);
-        return 0;
-    }
-    myNode->flaginit=0;
-
-    // printf("o file descas é este lol [%d]\n",filed);
-    char msgServer[BUFFER_SIZE];
-    snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
-    n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
-    // printf("Nó registado no servidor\n");
-    if (n == -1) /*error*/ exit(1);
-    printf("Nó registado na net %s\n\n", net);
-
-    n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
-    if (n == -1) return -1;
-
-    // printf("Estou aqui seu boi do caralho\n");
-    buffer[n]='\0';
     
-    freeaddrinfo(res);
-
-    close(fd);
-    return filed;
+        close(fd);
+        return filed;
+    }
+    printf("Já está numa rede seu tonto \n");
+    return 0;
 }
 
 /* Função: djoin
@@ -304,7 +373,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     - Descritor de socket da ligação estabelecida, ou -1 em caso de falha.
 */
 int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
-    printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
+    // printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
     ssize_t nleft,nwritten;
     char *ptr;
     if (strcmp(connectIP, "0.0.0.0") == 0 && myNode->flaginit == 0) {
@@ -317,7 +386,17 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         
         // printf("Agora a flag init é %d\n",myNode->flaginit);
         return fd; //Devolve o nó criado
-    } else if(myNode->flaginit==1){
+    }else if(strcmp(connectIP, myNode->ip) == 0 && connectTCP == myNode->tcp_port){
+        printf("Não é possível conectar a si mesmo, seu BURROOOOO\n");
+        return -1;
+
+
+    }else if(myNode->vzext.socket_fd>0){
+        printf("Já está conectado a um nó externo, ou seja já estás numa rede de nós seu burro\n");
+        return -1;
+
+
+    }else if(myNode->flaginit==1){
         // Conectar ao nó externo especificado
         int sockfd = connect_to_node(connectIP, connectTCP);
         if (sockfd < 0) {
@@ -373,7 +452,14 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
 void show_topology(NodeData *myNode) {
     if (myNode->flaginit==1)
     {
+        
+        
     printf("\n=== Topologia Atual ===\n");
+    if (strcmp(myNode->net,"xxx")!=0)
+    {
+        printf("NET --> %s\n",myNode->net);
+    }
+    // printf("DEBUGGGG   {strcmp -- > %d, Net -->%s}\n",strcmp(myNode->net,"xxx"),myNode->net);  
     printf("ID: %s:%d\n", myNode->ip, myNode->tcp_port);
     
     printf("Vizinho Externo: %s:%d\n", 
@@ -385,14 +471,16 @@ void show_topology(NodeData *myNode) {
            myNode->vzsalv.tcp_port);
     
     printf("Vizinhos Internos (%d):\n", myNode->numInternalsReal);
-    
         int nInterno = 1;
         for (int i = 0; i < 10; i++) {
-            if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].tcp_port > 0)
+            if (myNode->intr[i].socket_fd != -1 /*&& myNode->intr[i].tcp_port > 0*/)
             {
                 printf("  %d. %s:%d\n", nInterno, myNode->intr[i].ip, myNode->intr[i].tcp_port);
                 nInterno++;
             }
+            // else{
+            //     printf("  %s:%d --> Não definido\n", myNode->intr[i].ip, myNode->intr[i].tcp_port);
+            // }
         }
         
     
