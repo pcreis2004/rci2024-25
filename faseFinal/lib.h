@@ -23,8 +23,10 @@ typedef struct {
     int numInternals;      // Número máximo de vizinhos internos que já tivemos
     int numInternalsReal;  // Número real de vizinhos internos
     int capacityInternals; // Capacidade alocada para vizinhos internos
+    
     char **objects;        // Lista de objetos armazenados
     int numObjects;
+    
     char **cache;          // Cache de objetos
     int cacheSize;
     int currentCacheSize;

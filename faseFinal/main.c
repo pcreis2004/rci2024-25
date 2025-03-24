@@ -282,7 +282,22 @@ int main(int argc, char *argv[]) {
                                 my_node.vzsalv.tcp_port = tcp_port;
                                 my_node.vzsalv.socket_fd = i;
                             }
+                        }else if (strncmp(message, "INTEREST",8)==0)
+                        {
+                            /* code */
+                            printf("Lida com interesse");
+                        }else if (strncmp(message,"NOOBJECT",8))
+                        {
+                            /* code */
+                            printf("Não tem o objeto");
+                        }else if (strncmp(message,"OBJECT",6))
+                        {
+                            /* code */
+                            printf("O nó tem objeto");
                         }
+                        
+                        
+                        
                     message = next_message + 1;
                     }
                     }

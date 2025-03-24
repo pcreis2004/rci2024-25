@@ -99,7 +99,27 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     {
         int fd = leave(myNode,ip,port);
         return fd;
+    }else if (strcmp(cmd,"c")== 0)
+    {
+        /* code */
+        printf("CREATE\n");
+    }else if (strcmp(cmd,"r")== 0)
+    {
+        /* code */
+        printf("Criar objeto\n");
+    }else if (strcmp(cmd,"sn")==0)
+    {
+        /* code */
+        printf("Show names\n");
+    }else if (strcmp(cmd,"si")== 0)
+    {
+        /* code */
+        printf("SHOW INTEREST TABLE\n");
     }
+    
+    
+    
+    
     
 
 
