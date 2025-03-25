@@ -18,6 +18,11 @@ Cenas a fazer:
 	Cenas das mensagens a funcionar
 	Obtenção de um objeto com o comando retrieve. 
 	Comandos create, delete, show names e show interest table operacionais.
+	
+	Melhorar a Lógica do handleRetrieve
+	Usa o select para esperar pelas mensagens dos outros nós,
+								e entra no handle retrieve quando recebe algo dos outros
+								Vê se já todos os nós já receberam antes de enviar mensagem para o nó de resposta
 
 Issues:
 

@@ -9,9 +9,16 @@ typedef struct NodeID {
     int tcp_port;
     int socket_fd;  // Socket de conexão com este nó
     int safe_sent;
+
+    int resposta;
+    int espera;
+    int fechado;
+
 } NodeID;
 
 typedef struct {
+    int flagoriginretrieve;
+    int interface_retrieve;
     int flaginit;
     char ip[16];
     char net[4];           // IP do nó atual
@@ -24,11 +31,12 @@ typedef struct {
     int numInternalsReal;  // Número real de vizinhos internos
     int capacityInternals; // Capacidade alocada para vizinhos internos
     
-    char **objects;        // Lista de objetos armazenados
+    char *objects;        // Lista de objetos armazenados
     int numObjects;
     
-    char **cache;          // Cache de objetos
+    char *cache;          // Cache de objetos
     int cacheSize;
+
     int currentCacheSize;
 } NodeData;
 
@@ -43,7 +51,6 @@ void updateMaxFD(fd_set *master_fds, int *max_fd);
 int cleanNeighboors(NodeData *my_node, fd_set *master_fds);
 int init_node(NodeData *myNode, int cache_size);
 int init_socket_listening(int port, char *ip);
-void free_node_memory(NodeData *myNode);
 int connect_to_node(char *ip, int port);
 void add_internal_neighbor(NodeData *myNode, NodeID neighbor);
 

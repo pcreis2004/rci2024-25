@@ -286,6 +286,16 @@ int main(int argc, char *argv[]) {
                         {
                             /* code */
                             printf("Lida com interesse");
+                            printf("Mensagem recebida: %s\n",message);
+                            int temp = handle_retreive(&my_node,message+9, i);
+                            if (temp != 0)
+                            {
+                                /* code */
+                                perror("handle_retreive");
+                                exit(1);
+                            }
+                           
+
                         }else if (strncmp(message,"NOOBJECT",8))
                         {
                             /* code */

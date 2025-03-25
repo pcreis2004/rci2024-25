@@ -164,24 +164,25 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
         my_node->vzext.socket_fd = -1;
         strcpy(my_node->vzext.ip, "");
     }
-
+    printf("Vizinho externo limpo\n");
     if (my_node->vzsalv.socket_fd >= 0) {
         FD_CLR(my_node->vzsalv.socket_fd, master_fds);
         my_node->vzsalv.tcp_port = -1;
         my_node->vzsalv.socket_fd = -1;
         strcpy(my_node->vzsalv.ip, "");
     }
-
-    for (int i = 0; i < my_node->numInternals; i++) {
-        if (my_node->intr[i].socket_fd != -1) {
+    printf("Vizinho de salvaguarda limpo\n");
+    for (int i = 0; i < 10; i++) {
+        if (my_node->intr[i].socket_fd >= 0) {
             FD_CLR(my_node->intr[i].socket_fd, master_fds);
             my_node->intr[i].tcp_port = -1;
             my_node->intr[i].socket_fd = -1;
             my_node->intr[i].ip[0] = '\0';
             my_node->numInternalsReal--;
+            printf("Vizinho interno %d limpo\n", i);
         }
     }
-
+    printf("Vizinhos internos limpos\n");
     my_node->numInternals = 0;
     my_node->numInternalsReal = 0;
     // Recalcular max_fd
@@ -192,6 +193,7 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
 
         }
     }
+    printf("Tudo limpo\n");
     // printf("O novo max fd é %d e o fd da socket de listening é %d",new_max_fd,my_node->socket_listening);
     return new_max_fd;
 }
@@ -212,16 +214,23 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
 
 int init_node(NodeData *myNode, int cache_size) {
     // Inicializar o nó com seu próprio ID como vizinho externo (inicialmente)
-    
+    myNode->flagoriginretrieve=0;
+    myNode->interface_retrieve=0;
     memset(&myNode->vzext,0,sizeof(NodeID));
     myNode->vzext.tcp_port=-1;
     myNode->vzext.socket_fd=-1;
     myNode->vzext.safe_sent=0;
+    myNode->vzext.resposta=0;
+    myNode->vzext.espera=0;
+    myNode->vzext.fechado=0;    
     // Inicializar vizinho de salvaguarda como não definido
     memset(&myNode->vzsalv, 0, sizeof(NodeID));
     myNode->vzsalv.tcp_port=-1;
     myNode->vzsalv.socket_fd = -1;
     myNode->vzsalv.safe_sent=0;
+    myNode->vzsalv.resposta=0;
+    myNode->vzsalv.espera=0;
+    myNode->vzsalv.fechado=0;
     // Inicializar lista de vizinhos internos
     myNode->intr = malloc(10 * sizeof(NodeID));  // Capacidade inicial
     for (int i = 0; i < 10; i++)
@@ -230,18 +239,25 @@ int init_node(NodeData *myNode, int cache_size) {
         myNode->intr[i].socket_fd = -1;
         myNode->intr[i].safe_sent = 0;
         myNode->intr[i].ip[0] = '\0';
+        myNode->intr[i].resposta=0;
+        myNode->intr[i].espera=0;
+        myNode->intr[i].fechado=0;
     }
-    
+    myNode->numInternalsReal = 0;
     myNode->numInternals = 0;
     myNode->capacityInternals = 10;
     
     // Inicializar cache e objetos
     myNode->cacheSize = cache_size;
     myNode->currentCacheSize = 0;
-    myNode->cache = malloc(cache_size * sizeof(char*));
     
-    myNode->objects = malloc(100 * sizeof(char*));  // Capacidade inicial
+    myNode->cache = calloc(cache_size, 100);   // cacheSize blocos de 100 chars
+    myNode->objects = calloc(4, 100);          // 4 blocos de 100 chars
+
+
     myNode->numObjects = 0;
+    
+
     
     // Inicializar socket de escuta
     myNode->socket_listening = init_socket_listening(myNode->tcp_port, myNode->ip);
@@ -304,61 +320,8 @@ int init_socket_listening(int port, char *ip) {
     return fd;
 }
 
-/* Função: free_node_memory
-   Liberta a memória alocada dinamicamente pela estrutura NodeData,
-   incluindo listas de vizinhos, cache, objetos e encerra os sockets abertos.
-   Parâmetros:
-    - myNode: ponteiro para a estrutura NodeData cujos recursos serão libertados.
-   Retorno:
-    - Nenhum.
-*/
 
 
-void free_node_memory(NodeData *myNode) {
-    // Free the internal neighbors array
-    if (myNode->intr != NULL) {
-        free(myNode->intr);
-        myNode->intr = NULL;
-    }
-    
-    // Free the objects array and its contents
-    if (myNode->objects != NULL) {
-        for (int i = 0; i < myNode->numObjects; i++) {
-            if (myNode->objects[i] != NULL) {
-                free(myNode->objects[i]);
-            }
-        }
-        free(myNode->objects);
-        myNode->objects = NULL;
-    }
-    
-    // Free the cache array and its contents
-    if (myNode->cache != NULL) {
-        for (int i = 0; i < myNode->currentCacheSize; i++) {
-            if (myNode->cache[i] != NULL) {
-                free(myNode->cache[i]);
-            }
-        }
-        free(myNode->cache);
-        myNode->cache = NULL;
-    }
-    
-    // Close sockets
-    if (myNode->socket_listening > 0) {
-        close(myNode->socket_listening);
-    }
-    
-    if (myNode->vzext.socket_fd > 0) {
-        close(myNode->vzext.socket_fd);
-    }
-    
-    // Close all internal neighbors' sockets
-    for (int i = 0; i < myNode->numInternals; i++) {
-        if (myNode->intr[i].socket_fd > 0) {
-            close(myNode->intr[i].socket_fd);
-        }
-    }
-}
 /* Função: connect_to_node
    Estabelece uma conexão TCP com outro nó, a partir de um IP e porto dados.
    Parâmetros:
