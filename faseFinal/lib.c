@@ -228,6 +228,9 @@ int meterTudoAzero(NodeData *myNode) {
 
 
 int add_to_cache(NodeData *myNode, char *name) {
+
+
+
     // Verificar se o objeto já está na cache
     for (int i = 0; i < myNode->cacheSize * 100; i+=100) {
         if (strncmp(&myNode->cache[i], name, 100) == 0) {
@@ -241,23 +244,42 @@ int add_to_cache(NodeData *myNode, char *name) {
         if (myNode->cache[i] == '\0') { // Verifica se o espaço está vazio
             strncpy(&myNode->cache[i], name, 100);
             myNode->cache[i+99] = '\0'; // Garantir terminação
+            if(myNode->indexCacheFI==-1){
+                myNode->indexCacheFI=i;
+            }
             printf("Objeto '%s' adicionado à cache na posição %d.\n", name, i);
             return 1; // Sucesso
         }
     }
 
-    printf("Cache cheia, não foi possível adicionar '%s'.\n", name);
-    return -1; // Falha ao adicionar
+    printf("Cache cheia, para o nome '%s'.\n", name);
+    myNode->cache[myNode->indexCacheFI*100] = '\0'; // Limpa o espaço na cache
+    myNode->indexCacheFI++;
+    if(myNode->indexCacheFI >= myNode->cacheSize){
+
+        myNode->indexCacheFI=0; // Reinicia o índice
+
+    }
+    
+    add_to_cache(myNode, name); // Tenta adicionar novamente
+
+    return 0; // Falha ao adicionar
 }
+
 
 
 int printCache(NodeData *myNode) {
     printf("Cache:\n");
     for (int i = 0; i < myNode->cacheSize; i++) {
-        printf(" - %s\n", myNode->cache + (i * 100));
+        char *entry = myNode->cache + (i * 100);
+        
+        if (entry[0] != '\0') { // Só imprime se houver algo armazenado
+            printf(" - %s\n", entry);
+        }
     }
     return 0;
 }
+
 
 /* Função: init_node
    Inicializa a estrutura de dados de um nó da rede com as suas variáveis internas,
@@ -278,6 +300,8 @@ int init_node(NodeData *myNode, int cache_size) {
     myNode->objectfound=0;
     myNode->nodes_em_espera=0;
     
+    myNode->indexCacheFI=-1;
+
     memset(&myNode->vzext,0,sizeof(NodeID));
     myNode->vzext.tcp_port=-1;
     myNode->vzext.socket_fd=-1;

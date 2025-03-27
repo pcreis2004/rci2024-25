@@ -11,6 +11,8 @@ int handle_noobject(NodeData *myNode, char *name, int fd);
 int send_response(NodeData *myNode, char *msg);
 void show_names(NodeData *myNode);
 int create(NodeData *myNode, char *name);
+int delete(NodeData *myNode, char *name);
+int table_interest(NodeData *myNode, char *name);
 int leave(NodeData *myNode, char *serverIp,int serverPort);
 int handleLeave(NodeData *mynode,int fdClosed, fd_set *master_fds,int *max_fd);
 int join(char *net, char *ip, int port, NodeData *myNode, int cache_size);

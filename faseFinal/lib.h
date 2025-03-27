@@ -42,6 +42,8 @@ typedef struct {
     char *cache;          // Cache de objetos
     int cacheSize;
 
+    int indexCacheFI;
+
     int currentCacheSize;
 } NodeData;
 

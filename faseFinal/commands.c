@@ -147,7 +147,22 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
         /* code */
         printf("CACHE\n");
         printCache(myNode);
+    }else if (strcmp(cmd,"dl")==0)
+    {
+        /* code */
+        int fd = delete(myNode,arg1);
+        return fd;
+        printf("DELETE\n");
+    
+    }else if (strcmp(cmd,"si")==0)
+    {
+        printf("SHOW INTEREST TABLE\n");
+        int fd = table_interest(myNode,arg1);
+        return fd;
+        /* code */
     }
+    
+    
     
     
     
@@ -206,7 +221,64 @@ int retrieve(NodeData *myNode, char *name) {
     }
     
     myNode->interface_retrieve=1;
+
+
+    table_interest(myNode,name);    
     
+    return 0;
+}
+
+int table_interest(NodeData *myNode, char *name) {
+
+    printf("\n\n");
+    printf("TABELA DE INTERESSES\n");
+    
+    if (myNode->nodes_em_espera!=0){
+
+        printf("%s ",name);
+    
+        printf("%d:",myNode->vzext.socket_fd);
+        if (myNode->vzext.resposta == 1)
+        {
+            printf("resposta ");
+            /* code */
+        }else if (myNode->vzext.espera == 1)
+        {
+            printf("espera ");
+        
+        }else if (myNode->vzext.fechado == 1)
+        {
+            printf("fechado ");
+          
+        }
+        
+        for (int i = 0; i < 10; i++)
+        {
+            if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].socket_fd != myNode->vzext.socket_fd)
+            {
+                    printf("%d:",myNode->intr[i].socket_fd);
+                
+                if (myNode->intr[i].resposta == 1)
+                {
+                    printf("resposta ");
+                    /* code */
+                }else if (myNode->intr[i].espera == 1)
+                {
+                    printf("espera ");
+                
+                }else if (myNode->intr[i].fechado == 1)
+                {
+                    printf("fechado ");
+                  
+                }
+            }
+        }
+        
+    }
+    printf("\n\n");
+    
+    
+
     return 0;
 }
 
@@ -259,7 +331,7 @@ int handle_interest(NodeData *myNode, char *name, int fd){
                     printf("Objeto '%s' encontrado no índice %d.\n", name, i / 100);
                     sprintf(buffer,"OBJECT %s\n",name);
 
-
+                    table_interest(myNode,name);
                     send_response(myNode,buffer);
                     
                     return 1; // Objeto encontrado
@@ -294,7 +366,7 @@ int handle_interest(NodeData *myNode, char *name, int fd){
                 myNode->nodes_em_espera++;
             }
         }
-
+        table_interest(myNode,name);
         if (myNode->nodes_em_espera==0)
         {
             printf("Nenhum vizinho para enviar a mensagem\n");
@@ -359,6 +431,8 @@ int handle_object(NodeData *myNode, char *name, int fd){
         printf("Cache cheia\n");
         
     }
+
+    table_interest(myNode,name);
     if (myNode->nodes_em_espera==0)
     {
             /* code */
@@ -537,6 +611,20 @@ int create(NodeData *myNode, char *name) {
 
     printf("Erro: vetor de objetos cheio.\n");
     return -1;
+}
+
+int delete(NodeData *myNode, char *name) {
+    for (int i = 0; i < 4 * 100; i += 100) {
+        if (strncmp(&myNode->objects[i], name, 100) == 0) {  // Encontrou o objeto
+            myNode->objects[i] = '\0'; // Marcar como vazio
+            myNode->numObjects--;
+            printf("Objeto removido com sucesso: %s\n", name);
+            return 0;
+        }
+    }
+
+    printf("Erro: Objeto '%s' não encontrado.\n", name);
+    return 0;
 }
 
 
