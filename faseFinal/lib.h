@@ -20,6 +20,11 @@ typedef struct {
     int flagoriginretrieve;
     int interface_retrieve;
     int flaginit;
+
+    int objectfound;
+
+    int nodes_em_espera;
+
     char ip[16];
     char net[4];           // IP do nó atual
     int tcp_port;          // Porto TCP do nó atual
@@ -49,6 +54,7 @@ void sendSafeToAllInternals(NodeData *mynode);
 void writeFull(int socket_fd, const char *msg);
 void updateMaxFD(fd_set *master_fds, int *max_fd);
 int cleanNeighboors(NodeData *my_node, fd_set *master_fds);
+int meterTudoAzero(NodeData *myNode);
 int init_node(NodeData *myNode, int cache_size);
 int init_socket_listening(int port, char *ip);
 int connect_to_node(char *ip, int port);

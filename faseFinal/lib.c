@@ -198,7 +198,33 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
     return new_max_fd;
 }
 
+int meterTudoAzero(NodeData *myNode) {
 
+   
+
+    myNode->vzext.espera=0;
+    myNode->vzext.fechado=0;
+    myNode->vzext.resposta=0;
+    
+    myNode->vzsalv.espera=0;
+    myNode->vzsalv.fechado=0;
+    myNode->vzsalv.resposta=0;
+    
+    for (int i = 0; i < 10; i++)
+    {
+        myNode->intr[i].espera=0;
+        myNode->intr[i].fechado=0;
+        myNode->intr[i].resposta=0;
+    }
+    
+
+    
+    myNode->nodes_em_espera=0;
+    myNode->flagoriginretrieve=0;
+    myNode->interface_retrieve=0;
+
+    return 0;
+}
 
 
 
@@ -212,10 +238,15 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
     - Descritor do socket de escuta criado para o nó.
 */
 
+
+
 int init_node(NodeData *myNode, int cache_size) {
     // Inicializar o nó com seu próprio ID como vizinho externo (inicialmente)
     myNode->flagoriginretrieve=0;
     myNode->interface_retrieve=0;
+    myNode->objectfound=0;
+    myNode->nodes_em_espera=0;
+
     memset(&myNode->vzext,0,sizeof(NodeID));
     myNode->vzext.tcp_port=-1;
     myNode->vzext.socket_fd=-1;
@@ -223,6 +254,7 @@ int init_node(NodeData *myNode, int cache_size) {
     myNode->vzext.resposta=0;
     myNode->vzext.espera=0;
     myNode->vzext.fechado=0;    
+
     // Inicializar vizinho de salvaguarda como não definido
     memset(&myNode->vzsalv, 0, sizeof(NodeID));
     myNode->vzsalv.tcp_port=-1;
@@ -231,6 +263,7 @@ int init_node(NodeData *myNode, int cache_size) {
     myNode->vzsalv.resposta=0;
     myNode->vzsalv.espera=0;
     myNode->vzsalv.fechado=0;
+
     // Inicializar lista de vizinhos internos
     myNode->intr = malloc(10 * sizeof(NodeID));  // Capacidade inicial
     for (int i = 0; i < 10; i++)

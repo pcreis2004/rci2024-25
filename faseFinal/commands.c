@@ -141,11 +141,15 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     return 0;
 }
 
+
 int retrieve(NodeData *myNode, char *name) {
     printf("RETRIEVE\n");
-    int objectFound = 0;
-    myNode->flagoriginretrieve=1;
+
+    myNode->objectfound = 0;
+    myNode->flagoriginretrieve=1; //Identifica nó origem
+
     char msg[BUFFER_SIZE];
+
     sprintf(msg,"INTEREST %s\n",name);
     printf("Mensagem de interesse: %s\n",msg);
 
@@ -156,6 +160,7 @@ int retrieve(NodeData *myNode, char *name) {
         printf("Mensagem enviada para o vizinho externo\n");
         myNode->vzext.espera=1;
         myNode->vzext.fechado=0;
+        myNode->nodes_em_espera++;
     }
     
     for (int i = 0; i < 10; i++)
@@ -166,30 +171,33 @@ int retrieve(NodeData *myNode, char *name) {
             printf("Mensagem enviada para o vizinho interno %d\n",i);
             myNode->intr[i].espera=1;
             myNode->intr[i].fechado=0;
+            myNode->nodes_em_espera++;
         }
         
     }
 
-    printf("ESPERANDO POR RESPOSTAS\n");
+    if (myNode->nodes_em_espera==0)
+    {
+        printf("Nenhum vizinho para enviar a mensagem\n");
+        /* code */
+    }
+    
     myNode->interface_retrieve=1;
     
     return 0;
 }
 
-int handle_retreive(NodeData *myNode, char *name, int fd){
+int handle_interest(NodeData *myNode, char *name, int fd){
 
-    int objectFound = 0;
-    char object[BUFFER_SIZE];
-    sprintf(object,"OBJECT %s\n",name);
+    myNode->objectfound = 0;
 
-
-    char noobject[BUFFER_SIZE];
-    sprintf(noobject,"NOOBJECT %s\n",name);
+  
 
     char buffer[BUFFER_SIZE];
 
     if (myNode->interface_retrieve==0)
     {
+        myNode->interface_retrieve=1;
         if (myNode->vzext.socket_fd == fd) {
             printf("Mensagem enviada pelo nó externo\n");
             myNode->vzext.resposta=1;
@@ -206,18 +214,29 @@ int handle_retreive(NodeData *myNode, char *name, int fd){
         
         }
         
+        if (myNode->vzext.resposta != 1)
+        {
+            myNode->vzext.resposta=0;
+        }
+
+        
+        
+
         // 2. Procurar o objeto no vetor `objects`
         for (int i = 0; i < 4 * 100; i += 100) {
             if (myNode->objects[i] != '\0') {
                 if (strncmp(&myNode->objects[i], name, 100) == 0) {
                     printf("Objeto '%s' encontrado no índice %d.\n", name, i / 100);
                     sprintf(buffer,"OBJECT %s\n",name);
-                    writeFull(fd, buffer);
+
+
+                    send_response(myNode,buffer);
+                    
                     return 1; // Objeto encontrado
                 }
             }
         }
-    
+        
         printf("Objeto '%s' não encontrado.\n", name);
     
         printf("Perguntar aos outros vizinhos\n");
@@ -227,72 +246,92 @@ int handle_retreive(NodeData *myNode, char *name, int fd){
     
         snprintf(buffer, sizeof(buffer), "INTEREST %s\n", name);
         // Colocar contador de nós de que estamos a comunicar e comparar com os que já estão fechados para saber quando acabar????
+        printf("Socket do externo é %d e a socket do fd é %d\n",myNode->vzext.socket_fd,fd);
         if (myNode->vzext.socket_fd != -1 && myNode->vzext.socket_fd != fd && myNode->vzext.resposta == 0) {
+            printf("Mensagem enviada para nó externo --> %s\n", buffer);
             writeFull(myNode->vzext.socket_fd, buffer);
             myNode->vzext.espera=1;
             myNode->vzext.fechado=0;
+            myNode->nodes_em_espera++;
         }
     
         for (int i = 0; i < 10; i++) {
-            if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].socket_fd != myNode->vzext.socket_fd && myNode->intr[i].resposta == 0) {
+            printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, e a fd = %d e a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,fd,myNode->vzext.socket_fd,myNode->intr[i].resposta);
+            if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].socket_fd != myNode->vzext.socket_fd && myNode->intr[i].resposta == 0 && myNode->intr[i].socket_fd != fd) {
+                printf("Mensagem enviada para nó interno %d --> %s\n",i, buffer);
                 writeFull(myNode->intr[i].socket_fd, buffer);
                 myNode->intr[i].espera=1;
                 myNode->intr[i].fechado=0;
+                myNode->nodes_em_espera++;
             }
         }
-    }
-    
 
-
-    printf("ESPERANDO POR RESPOSTAS\n");
-    if (myNode->vzext.espera==1)
-    {
-        
-        if (strcmp(buffer,object)==0)
-            {
-                printf("O objeto está na rede --- SUCESSOOOOOOOOO\n");
-                objectFound = 1;
-                if (objectFound == 1)
-                {
-                    writeFull(fd, object);
-                }
-                
-                
-            }else if (strcmp(buffer,noobject)==0)
-            {
-                printf("Objeto não encontrado\n");
-            }
-        myNode->vzext.espera=0;
-        myNode->vzext.fechado=1;
-    }
-    printf("Esperando resposta dos internos\n");
-
-    for (int i = 0; i < 10; i++)
-    {
-        if (myNode->intr[i].espera==1 && myNode->intr[i].socket_fd != myNode->vzext.socket_fd)
+        if (myNode->nodes_em_espera==0)
         {
-            
-            if (strcmp(buffer,object)==0)
+            printf("Nenhum vizinho para enviar a mensagem\n");
+            if (myNode->flagoriginretrieve==1)
             {
-                printf("O objeto está na rede --- SUCESSOOOOOOOOO\n");
-                objectFound = 1;
-                if (objectFound == 1)
-                {
-                    writeFull(fd, object);
-                }
-                
-            }else if (strcmp(buffer,noobject)==0)
+                printf("Acaba aqui\n");
+
+            }else
             {
-                printf("Objeto não encontrado\n");
+                printf("Enviar uma mensagem para o nó que enviou resposta, NOOBJECT\n");
             }
-            myNode->intr[i].espera=0;
-            myNode->intr[i].fechado=1;
+            
+            /* code */
         }
+
+        return 0;
     }
     
-    if (objectFound == 0)
+
+    return 0;
+}
+
+int handle_object(NodeData *myNode, char *name, int fd){
+
+    //Ver de onde veio o objeto e colocar esse nó como fechado
+    //Colocar o object found a 1
+    //Enviar o objeto para o nó de resposta = 1;
+    //Colocar a interface de retrieve a 0;
+
+    //COLOCAR NA CAHCE O NAME
+
+    if (myNode->vzext.socket_fd == fd && myNode->vzext.resposta == 0) {
+        printf("Mensagem enviada pelo nó externo\n");
+        myNode->vzext.fechado=1;
+        myNode->vzext.espera=0;
+        myNode->objectfound=1;
+        myNode->nodes_em_espera--;
+    }else{
+        for (int i = 0; i < myNode->numInternals; i++)
+        {
+            if (myNode->intr[i].socket_fd == fd && myNode->intr[i].resposta == 0)
+            {
+                printf("Mensagem enviada pelo nó interno %d\n",i);
+                myNode->intr[i].fechado=1;
+                myNode->intr[i].espera=0;
+                myNode->objectfound=1;
+                myNode->nodes_em_espera--;
+            }
+            
+        }
+    
+    }
+
+    //GUARDAR NAME NA CACHE --> myNODE CACHE [i] = name;
+    if (myNode->nodes_em_espera==0 && myNode->objectfound == 1)
     {
-        writeFull(fd, noobject);
+        printf("Todos os nós responderam\n");
+        char buffer[BUFFER_SIZE];
+    
+    
+        snprintf(buffer, sizeof(buffer), "OBJECT %s\n", name);
+
+        send_response(myNode,buffer);
+        myNode->interface_retrieve=0;
+        return 0;
+
     }
     
     
@@ -301,6 +340,109 @@ int handle_retreive(NodeData *myNode, char *name, int fd){
     return 0;
 }
 
+int handle_noobject(NodeData *myNode, char *name, int fd){
+
+    //Ver de onde veio o objeto e colocar esse nó como fechado
+    //manter o object found a 0
+    
+
+    if (myNode->vzext.socket_fd == fd && myNode->vzext.resposta == 0) {
+        printf("Mensagem enviada pelo nó externo\n");
+        myNode->vzext.fechado=1;
+        myNode->vzext.espera=0;
+        myNode->nodes_em_espera--;
+    }else{
+        for (int i = 0; i < myNode->numInternals; i++)
+        {
+            if (myNode->intr[i].socket_fd == fd && myNode->intr[i].resposta == 0)
+            {
+                printf("Mensagem enviada pelo nó interno %d\n",i);
+                myNode->intr[i].fechado=1;
+                myNode->intr[i].espera=0;
+                myNode->nodes_em_espera--;
+            }
+            
+        }
+    
+    }
+    //Loop para ver se tá tudo fechado, caso verdade
+    if (myNode->nodes_em_espera==0)
+{
+        /* code */
+        
+        if (myNode->objectfound == 0)
+        {
+            if (myNode->flagoriginretrieve==1)
+            {
+                return 3;
+            }
+            
+            char buffer[BUFFER_SIZE];
+    
+    
+            snprintf(buffer, sizeof(buffer), "OBJECT %s\n", name);
+    
+            send_response(myNode,buffer);
+            myNode->interface_retrieve=0;
+            return 0;
+        }else if (myNode->objectfound == 1)
+        {
+            if (myNode->flagoriginretrieve==1)
+            {
+                return 2;
+            }
+            
+            char buffer[BUFFER_SIZE];
+
+            snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
+
+            send_response(myNode,buffer);
+            myNode->interface_retrieve=0;
+            return 0;
+            /* code */
+        }
+        
+        
+    }
+    char buffer[BUFFER_SIZE];
+
+    snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
+    //Alterar o fd para coiso de resposta
+    writeFull(fd, buffer);
+
+    return 0;
+}
+
+int send_response(NodeData *myNode, char *msg){
+
+    //Encontrar o resposta = a 0
+    //Enviar o objeto para o nó de resposta = 1;
+    // E enviar resposta pelo writefull
+    //Colocar a interface de retrieve a 0;
+
+    if (myNode->vzext.resposta == 1) {
+        printf("Enviar resposta pelo Externo\n");
+        writeFull(myNode->vzext.socket_fd, msg);
+        meterTudoAzero(myNode);
+        return 0;
+        
+    }
+
+    for (int i = 0; i < 10; i++)
+    {
+        if (myNode->intr[i].resposta == 1)
+        {
+            printf("Enviar resposta pelo interno\n");
+            writeFull(myNode->intr[i].socket_fd, msg);
+            meterTudoAzero(myNode);
+            return 0;
+        }
+        
+    }
+    
+
+    return 1;
+}
 
 void show_names(NodeData *myNode) {
     printf("Objetos armazenados:\n");

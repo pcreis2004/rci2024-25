@@ -5,7 +5,10 @@
 
 int handle_command(char *command, NodeData *myNode, char *ip, int port);
 int retrieve(NodeData *myNode, char *name);
-int handle_retreive(NodeData *myNode, char *name, int fd);
+int handle_interest(NodeData *myNode, char *name, int fd);
+int handle_object(NodeData *myNode, char *name, int fd);
+int handle_noobject(NodeData *myNode, char *name, int fd);
+int send_response(NodeData *myNode, char *msg);
 void show_names(NodeData *myNode);
 int create(NodeData *myNode, char *name);
 int leave(NodeData *myNode, char *serverIp,int serverPort);

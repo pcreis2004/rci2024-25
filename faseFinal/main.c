@@ -287,23 +287,33 @@ int main(int argc, char *argv[]) {
                             /* code */
                             printf("Lida com interesse");
                             printf("Mensagem recebida: %s\n",message);
-                            int temp = handle_retreive(&my_node,message+9, i);
-                            if (temp != 0)
+                            int temp = handle_interest(&my_node,message+9, i);
+
+                            if (temp == 1)
                             {
-                                /* code */
-                                perror("handle_retreive");
-                                exit(1);
+                                printf("OBJETO ENCONTRADO ---->> VIVA");
                             }
+
                            
 
-                        }else if (strncmp(message,"NOOBJECT",8))
+                        }
+                        else if (strncmp(message,"OBJECT",6)==0)
                         {
+                            printf("\tESTAMOS NA SECCAO OBJECTMensagem recebida: %s\n",message);
+                            int temp = handle_object(&my_node,message+7,i);
                             /* code */
-                            printf("Não tem o objeto");
-                        }else if (strncmp(message,"OBJECT",6))
+                            
+                            
+                            printf("Objeto encontrado VIVAAAA");
+                        }
+                        else if (strncmp(message,"NOOBJECT",8)==0)
                         {
+                            printf("\tESTAMOS NA SECCAO NOOBJECT Mensagem recebida: %s\n",message);
+                            int temp = handle_noobject(&my_node,message+9,i);
+                            if (temp == 3) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>><Objeto não encontrado");
+                            else if (temp == 2) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>Objeto encontrado");
                             /* code */
-                            printf("O nó tem objeto");
+                            printf("Objeto não encontrado FUDEUUUUU");
                         }
                         
                         
