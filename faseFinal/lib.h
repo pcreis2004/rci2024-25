@@ -55,6 +55,8 @@ void writeFull(int socket_fd, const char *msg);
 void updateMaxFD(fd_set *master_fds, int *max_fd);
 int cleanNeighboors(NodeData *my_node, fd_set *master_fds);
 int meterTudoAzero(NodeData *myNode);
+int add_to_cache(NodeData *myNode, char *object);
+int printCache(NodeData *myNode);
 int init_node(NodeData *myNode, int cache_size);
 int init_socket_listening(int port, char *ip);
 int connect_to_node(char *ip, int port);

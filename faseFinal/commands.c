@@ -127,7 +127,30 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     {
         /* code */
         printf("SHOW INTEREST TABLE\n");
+    }else if (strcmp(cmd,"print")==0)
+    {
+        /* code */
+        printf("myNode->vzext.socket_fd =  %d, resposta:%d\n",myNode->vzext.socket_fd,myNode->vzext.resposta);
+
+        for (int i = 0; i < 10; i++)
+        {
+            /* code */
+            printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,myNode->vzext.socket_fd,myNode->intr[i].resposta);
+        }
+        
+
+
+
+
+    }else if (strcmp(cmd,"cache")==0)
+    {
+        /* code */
+        printf("CACHE\n");
+        printCache(myNode);
     }
+    
+    
+    
     
     
     
@@ -220,6 +243,13 @@ int handle_interest(NodeData *myNode, char *name, int fd){
         }
 
         
+        for (int i = 0; i < 10; i++)
+        {
+            if (myNode->intr[i].resposta != 1)
+            {
+                myNode->intr[i].resposta=0;
+            }
+        }
         
 
         // 2. Procurar o objeto no vetor `objects`
@@ -241,12 +271,11 @@ int handle_interest(NodeData *myNode, char *name, int fd){
     
         printf("Perguntar aos outros vizinhos\n");
     
-        printf("ESPERANDO POR RESPOSTAS\n");
         
-    
+        
         snprintf(buffer, sizeof(buffer), "INTEREST %s\n", name);
         // Colocar contador de nós de que estamos a comunicar e comparar com os que já estão fechados para saber quando acabar????
-        printf("Socket do externo é %d e a socket do fd é %d\n",myNode->vzext.socket_fd,fd);
+        // printf("Socket do externo é %d e a socket do fd é %d\n",myNode->vzext.socket_fd,fd);
         if (myNode->vzext.socket_fd != -1 && myNode->vzext.socket_fd != fd && myNode->vzext.resposta == 0) {
             printf("Mensagem enviada para nó externo --> %s\n", buffer);
             writeFull(myNode->vzext.socket_fd, buffer);
@@ -254,9 +283,9 @@ int handle_interest(NodeData *myNode, char *name, int fd){
             myNode->vzext.fechado=0;
             myNode->nodes_em_espera++;
         }
-    
+        
         for (int i = 0; i < 10; i++) {
-            printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, e a fd = %d e a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,fd,myNode->vzext.socket_fd,myNode->intr[i].resposta);
+            // printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, e a fd = %d e a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,fd,myNode->vzext.socket_fd,myNode->intr[i].resposta);
             if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].socket_fd != myNode->vzext.socket_fd && myNode->intr[i].resposta == 0 && myNode->intr[i].socket_fd != fd) {
                 printf("Mensagem enviada para nó interno %d --> %s\n",i, buffer);
                 writeFull(myNode->intr[i].socket_fd, buffer);
@@ -272,15 +301,19 @@ int handle_interest(NodeData *myNode, char *name, int fd){
             if (myNode->flagoriginretrieve==1)
             {
                 printf("Acaba aqui\n");
-
+                
             }else
             {
+                snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
                 printf("Enviar uma mensagem para o nó que enviou resposta, NOOBJECT\n");
+                send_response(myNode,buffer);
             }
             
             /* code */
+            return 0;
         }
-
+        
+        printf("ESPERANDO POR RESPOSTAS\n");
         return 0;
     }
     
@@ -319,22 +352,54 @@ int handle_object(NodeData *myNode, char *name, int fd){
     
     }
 
-    //GUARDAR NAME NA CACHE --> myNODE CACHE [i] = name;
-    if (myNode->nodes_em_espera==0 && myNode->objectfound == 1)
+    // GUARDAR NAME NA CACHE --> myNODE CACHE [i] = name;
+    int cache = add_to_cache(myNode,name);
+    if (cache == -1)
     {
-        printf("Todos os nós responderam\n");
-        char buffer[BUFFER_SIZE];
-    
-    
-        snprintf(buffer, sizeof(buffer), "OBJECT %s\n", name);
-
-        send_response(myNode,buffer);
-        myNode->interface_retrieve=0;
-        return 0;
-
+        printf("Cache cheia\n");
+        
     }
+    if (myNode->nodes_em_espera==0)
+    {
+            /* code */
+            
+            if (myNode->objectfound == 0)
+            {
+                if (myNode->flagoriginretrieve==1)
+                {
+                    meterTudoAzero(myNode);
+                    return 3;
+                }
+                
+                char buffer[BUFFER_SIZE];
+                snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
+        
+        
+                
+                send_response(myNode,buffer);
+                myNode->interface_retrieve=0;
+                return 0;
+            }else if (myNode->objectfound == 1)
+            {
+                if (myNode->flagoriginretrieve==1)
+                {
+                    meterTudoAzero(myNode);
+                    return 2;
+                }
+                
+                char buffer[BUFFER_SIZE];
+                
+                snprintf(buffer, sizeof(buffer), "OBJECT %s\n", name);
     
-    
+                send_response(myNode,buffer);
+                myNode->interface_retrieve=0;
+                return 0;
+                /* code */
+            }
+            
+            
+        }
+
 
 
     return 0;
@@ -374,14 +439,15 @@ int handle_noobject(NodeData *myNode, char *name, int fd){
         {
             if (myNode->flagoriginretrieve==1)
             {
+                meterTudoAzero(myNode);
                 return 3;
             }
             
             char buffer[BUFFER_SIZE];
+            snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
     
     
-            snprintf(buffer, sizeof(buffer), "OBJECT %s\n", name);
-    
+            
             send_response(myNode,buffer);
             myNode->interface_retrieve=0;
             return 0;
@@ -389,12 +455,13 @@ int handle_noobject(NodeData *myNode, char *name, int fd){
         {
             if (myNode->flagoriginretrieve==1)
             {
+                meterTudoAzero(myNode);
                 return 2;
             }
             
             char buffer[BUFFER_SIZE];
-
-            snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
+            
+            snprintf(buffer, sizeof(buffer), "OBJECT %s\n", name);
 
             send_response(myNode,buffer);
             myNode->interface_retrieve=0;
@@ -404,11 +471,8 @@ int handle_noobject(NodeData *myNode, char *name, int fd){
         
         
     }
-    char buffer[BUFFER_SIZE];
 
-    snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
-    //Alterar o fd para coiso de resposta
-    writeFull(fd, buffer);
+    
 
     return 0;
 }
@@ -783,7 +847,7 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         myNode->vzext.tcp_port = connectTCP;
         myNode->vzext.socket_fd = sockfd;
         myNode->vzext.safe_sent = 0;
-        
+        myNode->vzext.resposta=0;
         // Enviar mensagem ENTRY
         char entry_msg[BUFFER_SIZE];
         snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", myNode->ip, myNode->tcp_port);

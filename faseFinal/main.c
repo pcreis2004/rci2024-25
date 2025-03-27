@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
 
     printf("NDN Node started. Enter commands:\n\n");
-
+my_node.cacheSize=cache_size;
     fd_set master_fds, read_fds;
     FD_ZERO(&master_fds);
     FD_SET(STDIN_FILENO, &master_fds);         // Adicionar stdin para comandos de usuário
@@ -199,6 +199,9 @@ int main(int argc, char *argv[]) {
                                 new_node.ip[sizeof(new_node.ip) - 1] = '\0';
                                 new_node.tcp_port = tcp_port;
                                 new_node.socket_fd = i;
+                                new_node.resposta=0;
+                                new_node.fechado=0;
+                                new_node.espera=0;
                                 
                                 // Verificar se o nó atual tem vizinho externo
                                 if (my_node.vzext.tcp_port == -1) {
@@ -299,21 +302,22 @@ int main(int argc, char *argv[]) {
                         }
                         else if (strncmp(message,"OBJECT",6)==0)
                         {
-                            printf("\tESTAMOS NA SECCAO OBJECTMensagem recebida: %s\n",message);
+                            // printf("\tESTAMOS NA SECCAO OBJECTMensagem recebida: %s\n",message);
                             int temp = handle_object(&my_node,message+7,i);
                             /* code */
                             
-                            
-                            printf("Objeto encontrado VIVAAAA");
+                            if (temp == 3) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>><Objeto não encontrado");
+                            else if (temp == 2) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>Objeto encontrado");
+                            // printf("Objeto encontrado VIVAAAA");
                         }
                         else if (strncmp(message,"NOOBJECT",8)==0)
                         {
-                            printf("\tESTAMOS NA SECCAO NOOBJECT Mensagem recebida: %s\n",message);
+                            // printf("\tESTAMOS NA SECCAO NOOBJECT Mensagem recebida: %s\n",message);
                             int temp = handle_noobject(&my_node,message+9,i);
                             if (temp == 3) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>><Objeto não encontrado");
                             else if (temp == 2) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>Objeto encontrado");
                             /* code */
-                            printf("Objeto não encontrado FUDEUUUUU");
+                            // printf("Objeto não encontrado FUDEUUUUU");
                         }
                         
                         

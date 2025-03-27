@@ -227,6 +227,37 @@ int meterTudoAzero(NodeData *myNode) {
 }
 
 
+int add_to_cache(NodeData *myNode, char *name) {
+    // Verificar se o objeto já está na cache
+    for (int i = 0; i < myNode->cacheSize * 100; i+=100) {
+        if (strncmp(&myNode->cache[i], name, 100) == 0) {
+            printf("Objeto '%s' já está na cache.\n", name);
+            return 0; // Já existe, não precisa adicionar
+        }
+    }
+
+    // Procurar um espaço vazio para adicionar
+    for (int i = 0; i < myNode->cacheSize*100; i+=100) {
+        if (myNode->cache[i] == '\0') { // Verifica se o espaço está vazio
+            strncpy(&myNode->cache[i], name, 100);
+            myNode->cache[i+99] = '\0'; // Garantir terminação
+            printf("Objeto '%s' adicionado à cache na posição %d.\n", name, i);
+            return 1; // Sucesso
+        }
+    }
+
+    printf("Cache cheia, não foi possível adicionar '%s'.\n", name);
+    return -1; // Falha ao adicionar
+}
+
+
+int printCache(NodeData *myNode) {
+    printf("Cache:\n");
+    for (int i = 0; i < myNode->cacheSize; i++) {
+        printf(" - %s\n", myNode->cache + (i * 100));
+    }
+    return 0;
+}
 
 /* Função: init_node
    Inicializa a estrutura de dados de um nó da rede com as suas variáveis internas,
@@ -246,7 +277,7 @@ int init_node(NodeData *myNode, int cache_size) {
     myNode->interface_retrieve=0;
     myNode->objectfound=0;
     myNode->nodes_em_espera=0;
-
+    
     memset(&myNode->vzext,0,sizeof(NodeID));
     myNode->vzext.tcp_port=-1;
     myNode->vzext.socket_fd=-1;
@@ -268,6 +299,7 @@ int init_node(NodeData *myNode, int cache_size) {
     myNode->intr = malloc(10 * sizeof(NodeID));  // Capacidade inicial
     for (int i = 0; i < 10; i++)
     {
+        memset(&myNode->intr[i], 0, sizeof(NodeID));
         myNode->intr[i].tcp_port = -1;
         myNode->intr[i].socket_fd = -1;
         myNode->intr[i].safe_sent = 0;
@@ -275,6 +307,7 @@ int init_node(NodeData *myNode, int cache_size) {
         myNode->intr[i].resposta=0;
         myNode->intr[i].espera=0;
         myNode->intr[i].fechado=0;
+        // printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,myNode->vzext.socket_fd,myNode->intr[i].resposta);
     }
     myNode->numInternalsReal = 0;
     myNode->numInternals = 0;
@@ -453,6 +486,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
         if (myNode->intr[i].socket_fd == -1)
         {
             myNode->intr[i] = neighbor;
+
             myNode->numInternalsReal++;
             if (myNode->numInternalsReal > myNode->numInternals)
     {
