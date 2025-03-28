@@ -5,25 +5,25 @@
 
 
 typedef struct NodeID {
-    char ip[16];
-    int tcp_port;
+    char ip[16];    // IP do nó
+    int tcp_port;   // Porto TCP do nó
     int socket_fd;  // Socket de conexão com este nó
-    int safe_sent;
+    int safe_sent;  // Flag para indicar se a mensagem SAFE foi enviada
 
-    int resposta;
-    int espera;
-    int fechado;
+    int resposta;   // Flag para indicar se o nó é o de resposta
+    int espera;     // Flag para indicar se o nó está a aguardar resposta
+    int fechado;     // Flag para indicar se o nó está fechado
 
 } NodeID;
 
 typedef struct {
-    int flagoriginretrieve;
-    int interface_retrieve;
-    int flaginit;
+    int flagoriginretrieve;   // Flag para indicar se o nó é o nó que invocou o retrieve
+    int interface_retrieve;  // Flag para indicar se o nó está aguardando resposta de outro nó
+    int flaginit;            // Flag para indicar se o nó foi inicializado
 
-    int objectfound;
+    int objectfound;    // Flag para indicar se o objeto foi encontrado
 
-    int nodes_em_espera;
+    int nodes_em_espera; // Número de nós em espera
 
     char ip[16];
     char net[4];           // IP do nó atual
@@ -36,15 +36,14 @@ typedef struct {
     int numInternalsReal;  // Número real de vizinhos internos
     int capacityInternals; // Capacidade alocada para vizinhos internos
     
-    char *objects;        // Lista de objetos armazenados
-    int numObjects;
+    char *objects;        // Vetor de objetos armazenados
+    int numObjects;         // Número de objetos armazenados
     
     char *cache;          // Cache de objetos
-    int cacheSize;
+    int cacheSize;          // Tamanho da cache
 
-    int indexCacheFI;
+    int indexCacheFI;       // Índice do "First in" na cache
 
-    int currentCacheSize;
 } NodeData;
 
 int handleLeave(NodeData *mynode,int fdClosed, fd_set *master_fds,int *max_fd);

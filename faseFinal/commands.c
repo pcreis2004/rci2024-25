@@ -36,7 +36,7 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     // Extrair comando e argumentos
     int args = sscanf(command, "%19s %99s %99s", cmd, arg1, arg2);
     
-    
+    // Verificar o tipo de comando
     if (strcmp(cmd, "help") == 0 || strcmp(cmd, "h") == 0) {
         printf("Comandos disponíveis:\n");
         printf("  join (j) net - Entrada na rede net\n");
@@ -47,12 +47,14 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
         printf("  show topology (st) - Visualização dos vizinhos\n");
         printf("  show names (sn) - Visualização dos nomes dos objetos guardados\n");
         printf("  show interest table (si) - Visualização da tabela de interesses\n");
+        printf("  cache - Visualização da cache\n");
         printf("  leave (l) - Saída da rede\n");
         printf("  exit (x) - Fecha a aplicação\n");
     } 
     else if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "x") == 0) {
         printf("Saindo...\n");
-        // free_node_memory(myNode);
+        leave(myNode, ip, port);
+        free_node_memory(myNode);
         exit(0);
     } 
     else if (strcmp(cmd, "direct") == 0 && args >= 3) {
@@ -98,7 +100,7 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     }else if (strcmp(cmd,"l")==0)
     {
 		if (myNode->flaginit==0) {
-			printf("Queres dar leave mas o teu nó nem está inicializado\n");
+			printf("Não pode dar leave sem ter o nó\n");
 			return 0;
 		
 		}
@@ -106,7 +108,7 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
         return fd;
     }else if (strcmp(cmd,"c")== 0)
     {
-        /* code */
+        
         int fd = create(myNode,arg1);
         return fd;
         printf("CREATE\n");
@@ -117,39 +119,24 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
         printf("RETRIEVE\n");
         int fd = retrieve(myNode, arg1);
         return fd;
-        /* code */
+        
     }else if (strcmp(cmd,"sn")==0)
     {
-        /* code */
+        
         show_names(myNode);
         printf("Show names\n");
     }else if (strcmp(cmd,"si")== 0)
     {
-        /* code */
-        printf("SHOW INTEREST TABLE\n");
-    }else if (strcmp(cmd,"print")==0)
-    {
-        /* code */
-        printf("myNode->vzext.socket_fd =  %d, resposta:%d\n",myNode->vzext.socket_fd,myNode->vzext.resposta);
-
-        for (int i = 0; i < 10; i++)
-        {
-            /* code */
-            printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,myNode->vzext.socket_fd,myNode->intr[i].resposta);
-        }
         
-
-
-
-
+        printf("SHOW INTEREST TABLE\n");
     }else if (strcmp(cmd,"cache")==0)
     {
-        /* code */
+        
         printf("CACHE\n");
         printCache(myNode);
     }else if (strcmp(cmd,"dl")==0)
     {
-        /* code */
+        
         int fd = delete(myNode,arg1);
         return fd;
         printf("DELETE\n");
@@ -157,29 +144,40 @@ int handle_command(char *command, NodeData *myNode, char *ip, int port) {
     }else if (strcmp(cmd,"si")==0)
     {
         printf("SHOW INTEREST TABLE\n");
-        int fd = table_interest(myNode,arg1);
-        return fd;
-        /* code */
-    }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-    else {
+        table_interest(myNode,arg1);
+        
+    }else {
         printf("Comando desconhecido: %s\n", command);
     }
     return 0;
 }
 
 
+/* Função: free_node_memory
+   Liberta a memória alocada para os dados do nó, incluindo vizinhos e objetos.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+   Retorno:
+    - Nenhum.
+*/
+void free_node_memory(NodeData *myNode) {
+    free(myNode->intr);
+    free(myNode->objects);
+    free(myNode->cache);
+    
+}
+
+
+
+/* Função: retrieve
+   Envia uma mensagem de interesse para o nó externo e vizinhos internos,
+   aguardando resposta sobre a existência do objeto.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+    - name: nome do objeto a ser recuperado.
+   Retorno:
+    - 0 em caso de sucesso.
+*/
 int retrieve(NodeData *myNode, char *name) {
     printf("RETRIEVE\n");
 
@@ -189,35 +187,34 @@ int retrieve(NodeData *myNode, char *name) {
     char msg[BUFFER_SIZE];
 
     sprintf(msg,"INTEREST %s\n",name);
-    printf("Mensagem de interesse: %s\n",msg);
 
+    // Enviar mensagem de interesse para o vizinho externo
     if (myNode->vzext.socket_fd == -1) {
         printf("Nó sem vizinho externo\n");
     }else{
         writeFull(myNode->vzext.socket_fd, msg);
-        printf("Mensagem enviada para o vizinho externo\n");
         myNode->vzext.espera=1;
         myNode->vzext.fechado=0;
         myNode->nodes_em_espera++;
     }
     
+    // Enviar mensagem de interesse para os vizinhos internos
     for (int i = 0; i < 10; i++)
     {
         if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].socket_fd != myNode->vzext.socket_fd)
         {
             writeFull(myNode->intr[i].socket_fd, msg);
-            printf("Mensagem enviada para o vizinho interno %d\n",i);
             myNode->intr[i].espera=1;
             myNode->intr[i].fechado=0;
             myNode->nodes_em_espera++;
         }
         
     }
-
+    // Verificar se há vizinhos para enviar a mensagem
     if (myNode->nodes_em_espera==0)
     {
         printf("Nenhum vizinho para enviar a mensagem\n");
-        /* code */
+        
     }
     
     myNode->interface_retrieve=1;
@@ -228,7 +225,16 @@ int retrieve(NodeData *myNode, char *name) {
     return 0;
 }
 
-int table_interest(NodeData *myNode, char *name) {
+
+/* Função: table_interest
+   Mostra a tabela de interesses do nó, incluindo vizinho externo e internos.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+    - name: nome do objeto de interesse.
+   Retorno:
+    - Nenhum.
+*/
+void table_interest(NodeData *myNode, char *name) {
 
     printf("\n\n");
     printf("TABELA DE INTERESSES\n");
@@ -241,7 +247,7 @@ int table_interest(NodeData *myNode, char *name) {
         if (myNode->vzext.resposta == 1)
         {
             printf("resposta ");
-            /* code */
+            
         }else if (myNode->vzext.espera == 1)
         {
             printf("espera ");
@@ -261,7 +267,7 @@ int table_interest(NodeData *myNode, char *name) {
                 if (myNode->intr[i].resposta == 1)
                 {
                     printf("resposta ");
-                    /* code */
+                    
                 }else if (myNode->intr[i].espera == 1)
                 {
                     printf("espera ");
@@ -279,9 +285,21 @@ int table_interest(NodeData *myNode, char *name) {
     
     
 
-    return 0;
 }
 
+
+
+/*Função handle_interest
+  Processa a mensagem de interesse recebida, verificando se o objeto está na cache
+  ou se deve ser enviado para os vizinhos internos e externo.
+  Parâmetros:
+   - myNode: ponteiro para a estrutura NodeData do nó atual.
+   - name: nome do objeto de interesse.
+   - fd: descritor de socket do nó que enviou a mensagem.
+  Retorno:
+   - 1 se o objeto foi encontrado, 0 caso contrário.
+
+*/
 int handle_interest(NodeData *myNode, char *name, int fd){
 
     myNode->objectfound = 0;
@@ -289,19 +307,17 @@ int handle_interest(NodeData *myNode, char *name, int fd){
   
 
     char buffer[BUFFER_SIZE];
-
+    // 1. Verificar que nó enviou a mensagem
     if (myNode->interface_retrieve==0)
     {
         myNode->interface_retrieve=1;
         if (myNode->vzext.socket_fd == fd) {
-            printf("Mensagem enviada pelo nó externo\n");
             myNode->vzext.resposta=1;
         }else{
             for (int i = 0; i < myNode->numInternals; i++)
             {
                 if (myNode->intr[i].socket_fd == fd)
                 {
-                    printf("Mensagem enviada pelo nó interno %d\n",i);
                     myNode->intr[i].resposta=1;
                 }
                 
@@ -325,7 +341,7 @@ int handle_interest(NodeData *myNode, char *name, int fd){
         
 
         // 2. Procurar o objeto no vetor `objects`
-        for (int i = 0; i < 4 * 100; i += 100) {
+        for (int i = 0; i < 10 * 100; i += 100) {
             if (myNode->objects[i] != '\0') {
                 if (strncmp(&myNode->objects[i], name, 100) == 0) {
                     printf("Objeto '%s' encontrado no índice %d.\n", name, i / 100);
@@ -339,27 +355,20 @@ int handle_interest(NodeData *myNode, char *name, int fd){
             }
         }
         
-        printf("Objeto '%s' não encontrado.\n", name);
-    
-        printf("Perguntar aos outros vizinhos\n");
     
         
         
         snprintf(buffer, sizeof(buffer), "INTEREST %s\n", name);
-        // Colocar contador de nós de que estamos a comunicar e comparar com os que já estão fechados para saber quando acabar????
-        // printf("Socket do externo é %d e a socket do fd é %d\n",myNode->vzext.socket_fd,fd);
+        // 3. Enviar mensagem de interesse para o vizinho externo
         if (myNode->vzext.socket_fd != -1 && myNode->vzext.socket_fd != fd && myNode->vzext.resposta == 0) {
-            printf("Mensagem enviada para nó externo --> %s\n", buffer);
             writeFull(myNode->vzext.socket_fd, buffer);
             myNode->vzext.espera=1;
             myNode->vzext.fechado=0;
             myNode->nodes_em_espera++;
         }
-        
+        // 4. Enviar mensagem de interesse para os vizinhos internos
         for (int i = 0; i < 10; i++) {
-            // printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, e a fd = %d e a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,fd,myNode->vzext.socket_fd,myNode->intr[i].resposta);
             if (myNode->intr[i].socket_fd != -1 && myNode->intr[i].socket_fd != myNode->vzext.socket_fd && myNode->intr[i].resposta == 0 && myNode->intr[i].socket_fd != fd) {
-                printf("Mensagem enviada para nó interno %d --> %s\n",i, buffer);
                 writeFull(myNode->intr[i].socket_fd, buffer);
                 myNode->intr[i].espera=1;
                 myNode->intr[i].fechado=0;
@@ -367,25 +376,19 @@ int handle_interest(NodeData *myNode, char *name, int fd){
             }
         }
         table_interest(myNode,name);
+        
         if (myNode->nodes_em_espera==0)
         {
-            printf("Nenhum vizinho para enviar a mensagem\n");
-            if (myNode->flagoriginretrieve==1)
+            if (myNode->flagoriginretrieve==0)
             {
-                printf("Acaba aqui\n");
                 
-            }else
-            {
                 snprintf(buffer, sizeof(buffer), "NOOBJECT %s\n", name);
-                printf("Enviar uma mensagem para o nó que enviou resposta, NOOBJECT\n");
                 send_response(myNode,buffer);
             }
             
-            /* code */
             return 0;
         }
         
-        printf("ESPERANDO POR RESPOSTAS\n");
         return 0;
     }
     
@@ -393,49 +396,54 @@ int handle_interest(NodeData *myNode, char *name, int fd){
     return 0;
 }
 
+
+/*Função handle_object
+  Processa a mensagem de objeto recebida, verificando se o objeto foi encontrado
+  e atualizando a tabela de interesses.
+  Parâmetros:
+   - myNode: ponteiro para a estrutura NodeData do nó atual.
+   - name: nome do objeto encontrado.
+   - fd: descritor de socket do nó que enviou a mensagem.
+  Retorno:
+   - 1 se o objeto foi encontrado, 0 caso contrário.
+
+*/
 int handle_object(NodeData *myNode, char *name, int fd){
 
     //Ver de onde veio o objeto e colocar esse nó como fechado
-    //Colocar o object found a 1
-    //Enviar o objeto para o nó de resposta = 1;
-    //Colocar a interface de retrieve a 0;
-
-    //COLOCAR NA CAHCE O NAME
 
     if (myNode->vzext.socket_fd == fd && myNode->vzext.resposta == 0) {
-        printf("Mensagem enviada pelo nó externo\n");
         myNode->vzext.fechado=1;
         myNode->vzext.espera=0;
         myNode->objectfound=1;
         myNode->nodes_em_espera--;
+        table_interest(myNode,name);
     }else{
         for (int i = 0; i < myNode->numInternals; i++)
         {
             if (myNode->intr[i].socket_fd == fd && myNode->intr[i].resposta == 0)
             {
-                printf("Mensagem enviada pelo nó interno %d\n",i);
                 myNode->intr[i].fechado=1;
                 myNode->intr[i].espera=0;
                 myNode->objectfound=1;
                 myNode->nodes_em_espera--;
+                table_interest(myNode,name);
             }
             
         }
     
     }
-
-    // GUARDAR NAME NA CACHE --> myNODE CACHE [i] = name;
+    // Guardar o nome na cache
     int cache = add_to_cache(myNode,name);
     if (cache == -1)
     {
         printf("Cache cheia\n");
         
     }
-
-    table_interest(myNode,name);
+    //ver se ainda tem nós em espera
     if (myNode->nodes_em_espera==0)
     {
-            /* code */
+            
             
             if (myNode->objectfound == 0)
             {
@@ -468,7 +476,7 @@ int handle_object(NodeData *myNode, char *name, int fd){
                 send_response(myNode,buffer);
                 myNode->interface_retrieve=0;
                 return 0;
-                /* code */
+                
             }
             
             
@@ -479,35 +487,48 @@ int handle_object(NodeData *myNode, char *name, int fd){
     return 0;
 }
 
+
+/*Função handle_noobject
+  Processa a mensagem de objeto não encontrado recebida, verificando se o objeto foi encontrado
+  e atualizando a tabela de interesses.
+  Parâmetros:
+   - myNode: ponteiro para a estrutura NodeData do nó atual.
+   - name: nome do objeto não encontrado.
+   - fd: descritor de socket do nó que enviou a mensagem.
+  Retorno:
+   - 1 se o objeto foi encontrado, 0 caso contrário.
+
+*/
 int handle_noobject(NodeData *myNode, char *name, int fd){
 
     //Ver de onde veio o objeto e colocar esse nó como fechado
-    //manter o object found a 0
+ 
     
 
     if (myNode->vzext.socket_fd == fd && myNode->vzext.resposta == 0) {
-        printf("Mensagem enviada pelo nó externo\n");
         myNode->vzext.fechado=1;
         myNode->vzext.espera=0;
         myNode->nodes_em_espera--;
+        table_interest(myNode,name);
     }else{
         for (int i = 0; i < myNode->numInternals; i++)
         {
             if (myNode->intr[i].socket_fd == fd && myNode->intr[i].resposta == 0)
             {
-                printf("Mensagem enviada pelo nó interno %d\n",i);
                 myNode->intr[i].fechado=1;
                 myNode->intr[i].espera=0;
                 myNode->nodes_em_espera--;
+                table_interest(myNode,name);
             }
             
         }
     
     }
-    //Loop para ver se tá tudo fechado, caso verdade
+
+    // Guardar o nome na cache
     if (myNode->nodes_em_espera==0)
-{
-        /* code */
+    {
+        
         
         if (myNode->objectfound == 0)
         {
@@ -540,7 +561,7 @@ int handle_noobject(NodeData *myNode, char *name, int fd){
             send_response(myNode,buffer);
             myNode->interface_retrieve=0;
             return 0;
-            /* code */
+            
         }
         
         
@@ -551,15 +572,20 @@ int handle_noobject(NodeData *myNode, char *name, int fd){
     return 0;
 }
 
+
+/*Função send_response
+  Envia a resposta para o nó que fez a requisição, seja ele externo ou interno.
+  Parâmetros:
+   - myNode: ponteiro para a estrutura NodeData do nó atual.
+   - msg: mensagem a ser enviada.
+  Retorno:
+   - 0 em caso de sucesso, 1 se não houver resposta.
+*/
 int send_response(NodeData *myNode, char *msg){
 
-    //Encontrar o resposta = a 0
-    //Enviar o objeto para o nó de resposta = 1;
-    // E enviar resposta pelo writefull
-    //Colocar a interface de retrieve a 0;
+    //Encontrar o nó de resposta e enviar mensagem
 
     if (myNode->vzext.resposta == 1) {
-        printf("Enviar resposta pelo Externo\n");
         writeFull(myNode->vzext.socket_fd, msg);
         meterTudoAzero(myNode);
         return 0;
@@ -570,7 +596,6 @@ int send_response(NodeData *myNode, char *msg){
     {
         if (myNode->intr[i].resposta == 1)
         {
-            printf("Enviar resposta pelo interno\n");
             writeFull(myNode->intr[i].socket_fd, msg);
             meterTudoAzero(myNode);
             return 0;
@@ -582,11 +607,19 @@ int send_response(NodeData *myNode, char *msg){
     return 1;
 }
 
+
+/* Função: show_topology
+   Exibe a topologia do nó, incluindo vizinho externo e internos.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+   Retorno:
+    - Nenhum.
+*/
 void show_names(NodeData *myNode) {
     printf("Objetos armazenados:\n");
 
     int found = 0;
-    for (int i = 0; i < 4 * 100; i += 100) {
+    for (int i = 0; i < 10 * 100; i += 100) {
         if (myNode->objects[i] != '\0') {  // bloco ocupado
             printf(" - %s\n", &myNode->objects[i]);
             found = 1;
@@ -598,8 +631,17 @@ void show_names(NodeData *myNode) {
     }
 }
 
+
+/* Função: create
+   Cria um novo objeto no vetor de objetos do nó, se houver espaço disponível.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+    - name: nome do objeto a ser criado.
+   Retorno:
+    - 0 em caso de sucesso, -1 se o vetor de objetos estiver cheio.
+*/
 int create(NodeData *myNode, char *name) {
-    for (int i = 0; i < 4 * 100; i += 100) {
+    for (int i = 0; i < 10 * 100; i += 100) {
         if (myNode->objects[i] == '\0') {  // bloco livre
             strncpy(&myNode->objects[i], name, 100);
             myNode->objects[i + 99] = '\0'; // garantir terminação
@@ -613,8 +655,17 @@ int create(NodeData *myNode, char *name) {
     return -1;
 }
 
+
+/* Função: delete
+   Remove um objeto do vetor de objetos do nó, se encontrado.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+    - name: nome do objeto a ser removido.
+   Retorno:
+    - 0 em caso de sucesso, -1 se o objeto não for encontrado.
+*/
 int delete(NodeData *myNode, char *name) {
-    for (int i = 0; i < 4 * 100; i += 100) {
+    for (int i = 0; i < 10 * 100; i += 100) {
         if (strncmp(&myNode->objects[i], name, 100) == 0) {  // Encontrou o objeto
             myNode->objects[i] = '\0'; // Marcar como vazio
             myNode->numObjects--;
@@ -639,6 +690,7 @@ int delete(NodeData *myNode, char *name) {
     - -2 indicando que o nó saiu da rede com sucesso.
 */
 int leave(NodeData *myNode, char *serverIp,int serverPort){
+    
     socklen_t addrlen;
     struct sockaddr addr;
     struct addrinfo hints, *res;
@@ -661,8 +713,18 @@ int leave(NodeData *myNode, char *serverIp,int serverPort){
 
 
     snprintf(buffer, sizeof(buffer), "UNREG %s %s %d\n", myNode->net, myNode->ip, myNode->tcp_port);
-    printf("\t\t\t%s\n",buffer);
 
+
+    // Configurar timeout para recvfrom (4 segundos)
+    struct timeval timeout;
+    timeout.tv_sec = 4;  // Segundos
+    timeout.tv_usec = 0; // Microssegundos
+
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("Erro ao configurar timeout");
+        close(fd);
+        return -1;
+    }
 
     n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) /*error*/ exit(1);
@@ -671,24 +733,20 @@ int leave(NodeData *myNode, char *serverIp,int serverPort){
     if (n == -1) return -1;
 
     buffer[n]='\0';
-    //IMPRIMIR AQUI PARA DEBUG
    
     close(fd);
     }
 
     if(myNode->flaginit==1){
 		close(myNode->vzext.socket_fd);
-		printf("socket %d fechada\n",myNode->vzext.socket_fd);
 
 		close(myNode->vzsalv.socket_fd);
-		printf("socket %d fechada\n",myNode->vzsalv.socket_fd);
 
     for (int i = 0; i < 10; i++)
     {   
 		if (myNode->intr[i].socket_fd != myNode->vzext.socket_fd)
 			{
 				close(myNode->intr[i].socket_fd);
-			    printf("socket %d fechada\n",myNode->intr[i].socket_fd);    
 			}
         
 		}
@@ -782,7 +840,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
         hints.ai_family = AF_INET; // IPv4
         hints.ai_socktype = SOCK_DGRAM; // UDP socket
         
-        char buffer[1024]; // Increased buffer size to handle multiple lines
+        char buffer[1024]; 
         sprintf(buffer, "%d", port);
         
         errcode = getaddrinfo(ip, buffer, &hints, &res);
@@ -791,6 +849,17 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
         char mensagem[20];
         snprintf(mensagem, sizeof(mensagem), "NODES %s\n", net);
         
+        // Configurar timeout para recvfrom (4 segundos)
+        struct timeval timeout;
+        timeout.tv_sec = 4;  // Segundos
+        timeout.tv_usec = 0; // Microssegundos
+
+        if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("Erro ao configurar timeout");
+            close(fd);
+            return -1;
+        }
+
         n = sendto(fd, mensagem, strlen(mensagem), 0, res->ai_addr, res->ai_addrlen);
         if (n == -1) /*error*/ exit(1);
         
@@ -801,51 +870,48 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
         buffer[n] = '\0';
         printf("Nó connectado à net %s\n", net);
         
-        // Parse the response to get IP addresses and ports
+        
         char *line = strtok(buffer, "\n");
         
-        // Skip first line (NODESLIST 100)
+        // Saltar a primeira linha
         if (line != NULL) {
             line = strtok(NULL, "\n");
         }
         
-        // Count how many servers we have
+        // Contar as linhas
         int server_count = 0;
-        char *servers[100]; // Assuming maximum 100 servers
+        char *servers[100]; // Assumindo no máximo 100 linhas
         
         while (line != NULL && server_count < 100) {
             servers[server_count++] = line;
             line = strtok(NULL, "\n");
         }
-        // If no servers available, return error
+        // Se não houver servidores disponíveis, registrar o nó
         if (server_count == 0) {
             char msgServer[BUFFER_SIZE];
             snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
-            // printf("A mensagem enviada foi %s", msgServer);
+            
             n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
-            // printf("Nó registado no servidor\n");
+            
             if(n == -1) /*error*/ exit(1);
     
             n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
-            // Store the selected IP and port in variables
-            // (You might want to modify the function parameters to pass these back)
-            // Example: strcpy(output_ip, selected_ip); *output_port = selected_port;
+            
             close(fd);
             return -1;
         }
         
-        // Choose a random server
+        // Escolher um servidor aleatório
         srand(time(NULL));
         int random_index = rand() % server_count;
         char selected_server[128];
         strcpy(selected_server, servers[random_index]);
         
-        // Extract IP and port from the selected server
+        // Extrair IP e porta do servidor selecionado
         char selected_ip[64];
         int selected_port;
         sscanf(selected_server, "%s %d", selected_ip, &selected_port);
         
-        // printf("Randomly selected server: %s:%d\n", selected_ip, selected_port);
     
         myNode->flaginit=1;
         int filed = djoin(myNode,selected_ip,selected_port,myNode->cacheSize);
@@ -861,18 +927,16 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
         }
         myNode->flaginit=0;
     
-        // printf("o file descas é este lol [%d]\n",filed);
         char msgServer[BUFFER_SIZE];
         snprintf(msgServer, sizeof(msgServer), "REG %s %s %d\n", net,myNode->ip,myNode->tcp_port);
         n = sendto(fd, msgServer, strlen(msgServer), 0, res->ai_addr, res->ai_addrlen);
-        // printf("Nó registado no servidor\n");
+        printf("Nó registado no servidor\n");
         if (n == -1) /*error*/ exit(1);
         printf("Nó registado na net %s\n\n", net);
     
         n = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, &addr, &addrlen);
         if (n == -1) return -1;
     
-        // printf("Estou aqui seu boi do caralho\n");
         buffer[n]='\0';
         
         freeaddrinfo(res);
@@ -880,7 +944,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
         close(fd);
         return filed;
     }
-    printf("Já está numa rede seu tonto \n");
+    printf("Já está numa rede\n");
     return 0;
 }
 
@@ -896,7 +960,7 @@ int join(char *net, char *ip, int port,NodeData *myNode,int cache_size) {
     - Descritor de socket da ligação estabelecida, ou -1 em caso de falha.
 */
 int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
-    // printf("O seu connectIP é %s\n E o seu flaginit é %d\n", connectIP,myNode->flaginit);
+    
     ssize_t nleft,nwritten;
     char *ptr;
     if (strcmp(connectIP, "0.0.0.0") == 0 && myNode->flaginit == 0) {
@@ -905,17 +969,15 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
 
         int fd = init_node(myNode, cache_size);
         
-        // myNode->flaginit=1;
         
-        // printf("Agora a flag init é %d\n",myNode->flaginit);
         return fd; //Devolve o nó criado
     }else if(strcmp(connectIP, myNode->ip) == 0 && connectTCP == myNode->tcp_port){
-        printf("Não é possível conectar a si mesmo, seu BURROOOOO\n");
+        printf("Não é possível connectar ao próprio nó\n");
         return -1;
 
 
     }else if(myNode->vzext.socket_fd>0){
-        printf("Já está conectado a um nó externo, ou seja já estás numa rede de nós seu burro\n");
+        printf("Já está conectado a um nó externo, ou seja já estás numa rede de nós\n");
         return -1;
 
 
@@ -927,7 +989,6 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
             return -1;
         }
         
-        // printf("Conectado a %s:%d (socket: %d)\n", connectIP, connectTCP, sockfd);
         
         // Atualizar vizinho externo
         strncpy(myNode->vzext.ip, connectIP, sizeof(myNode->vzext.ip) - 1);
@@ -945,14 +1006,12 @@ int djoin(NodeData *myNode, char *connectIP, int connectTCP, int cache_size) {
         while (nleft>0)
         {
             nwritten=write(sockfd,ptr,nleft);
-            // printf("\t\t\tmensagem enviada %s\n",ptr);
             if(nwritten<=0)/*error*/exit(1);
             nleft-=nwritten;
             ptr+=nwritten;
         }
         
         printf("Ligado na Socket:%d ao nó %s %d\n\n",sockfd,connectIP,connectTCP);
-        // printf("\t\tAguardando msg de SAFE . . . \n");
         
         // A resposta SAFE será tratada no loop principal que lê as mensagens recebidas
         return sockfd;
@@ -982,7 +1041,6 @@ void show_topology(NodeData *myNode) {
     {
         printf("NET --> %s\n",myNode->net);
     }
-    // printf("DEBUGGGG   {strcmp -- > %d, Net -->%s}\n",strcmp(myNode->net,"xxx"),myNode->net);  
     printf("ID: %s:%d\n", myNode->ip, myNode->tcp_port);
     
     printf("Vizinho Externo: %s:%d\n", 
@@ -996,14 +1054,12 @@ void show_topology(NodeData *myNode) {
     printf("Vizinhos Internos (%d):\n", myNode->numInternalsReal);
         int nInterno = 1;
         for (int i = 0; i < 10; i++) {
-            if (myNode->intr[i].socket_fd != -1 /*&& myNode->intr[i].tcp_port > 0*/)
+            if (myNode->intr[i].socket_fd != -1)
             {
                 printf("  %d. %s:%d\n", nInterno, myNode->intr[i].ip, myNode->intr[i].tcp_port);
                 nInterno++;
             }
-            // else{
-            //     printf("  %s:%d --> Não definido\n", myNode->intr[i].ip, myNode->intr[i].tcp_port);
-            // }
+            
         }
         
     

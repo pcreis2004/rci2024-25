@@ -1,6 +1,6 @@
 /******************************************************************************
- * (c) 2024-2025 Projeto AED - Grupo 94
- * Last modified: 25 / 10 / 2024 - (17:30)
+ * (c) 2024-2025 Projeto RCI - Grupo 97
+ * Last modified: 28 / 03 / 2025 - (17:30)
  *
  * NAME
  *   main.c
@@ -45,38 +45,45 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    NodeData my_node;
+    NodeData my_node;// Estrutura do nó
+
+    //Colocar argumentos da linha de comandos na estrutura do nó
     strncpy(my_node.ip, argv[2], sizeof(my_node.ip) - 1);
+    strcpy(my_node.net,"xxx");
     my_node.ip[sizeof(my_node.ip) - 1] = '\0';
     my_node.tcp_port = atoi(argv[3]);
-    strcpy(my_node.net,"xxx");
+    
     char reg_server_ip[16];
     int reg_server_port;
     int cache_size = atoi(argv[1]);
+
     if (argc >= 5) {
         strncpy(reg_server_ip, argv[4], sizeof(reg_server_ip) - 1);
         reg_server_ip[sizeof(reg_server_ip) - 1] = '\0';
     } else {
         strncpy(reg_server_ip, "193.136.138.142", sizeof(reg_server_ip) - 1);
-        reg_server_ip[sizeof(reg_server_ip) - 1] = '\0';  // <- adicionado para evitar warning
+        reg_server_ip[sizeof(reg_server_ip) - 1] = '\0';  
     }
-
+    
     if (argc >= 6) {
         reg_server_port = atoi(argv[5]);
     } else {
         reg_server_port = 59000;
     }
-
+    
     printf("Configuração:\n Cache: %d\n IP: %s\n TCP: %d\n RegIP: %s\n RegUDP: %d\n",
-           cache_size, my_node.ip, my_node.tcp_port, reg_server_ip, reg_server_port);
+        cache_size, my_node.ip, my_node.tcp_port, reg_server_ip, reg_server_port);
+        
+        
+        printf("A executar NDN. Insira comando:\n\n");
+    my_node.cacheSize=cache_size;
+    
 
-
-    printf("NDN Node started. Enter commands:\n\n");
-my_node.cacheSize=cache_size;
-    fd_set master_fds, read_fds;
-    FD_ZERO(&master_fds);
+    // Preparar argumentos do select
+    fd_set master_fds, read_fds; // Conjunto de descritores
+    FD_ZERO(&master_fds);  // Limpar conjuntos
     FD_SET(STDIN_FILENO, &master_fds);         // Adicionar stdin para comandos de usuário
-    int max_fd = STDIN_FILENO; 
+    int max_fd = STDIN_FILENO;  // Maior descritor 
 
 
     char command[BUFFER_SIZE];
@@ -104,8 +111,6 @@ my_node.cacheSize=cache_size;
                     if (fgets(command, sizeof(command), stdin) != NULL) {
                         command[strcspn(command, "\n")] = '\0';  // Remover \n
                         int fd = handle_command(command, &my_node, reg_server_ip, reg_server_port);
-						// printf("O valor de fd é %d, o valor de my_node.socket_listening é %d e o valor de my_node.flaginit é %d\n",fd,my_node.socket_listening,my_node.flaginit);
-                        // printf("O max_fd é %d\n",max_fd);
                         if(my_node.socket_listening!=-1 && my_node.flaginit==0){    
                             FD_SET(my_node.socket_listening, &master_fds);//Adicionar socket de listening
                             my_node.flaginit=1;
@@ -113,13 +118,15 @@ my_node.cacheSize=cache_size;
                                 max_fd = my_node.socket_listening;
                             }
                         }
+
+                        // Verificar se o socket de listening foi criado
                         if (fd != 0 && fd != -1 && fd != -2) {
                             FD_SET(fd, &master_fds);
-                            if (max_fd < fd) {
+                            if (max_fd < fd) {//Verificar se é o maior fd
                                 max_fd = fd;
                             }
                         }
-
+                            
                         if (fd == -2) {
 
                             max_fd = cleanNeighboors(&my_node, &master_fds);
@@ -130,6 +137,7 @@ my_node.cacheSize=cache_size;
                 
                 // Nova conexão no socket de escuta
                 else if (i == my_node.socket_listening) {
+                    //
                     struct sockaddr_in client_addr;
                     socklen_t addrlen = sizeof(client_addr);
                     int new_fd = accept(my_node.socket_listening, (struct sockaddr *)&client_addr, &addrlen);
@@ -222,7 +230,6 @@ my_node.cacheSize=cache_size;
                                       
                                     ptr=safe_msg;
                                     nleft=strlen(safe_msg);
-                                    printf("Enviar para a socket %d que é um nó interno %s:%d e agora é o externo a mensagem --> %s",i,my_node.vzext.ip,my_node.vzext.tcp_port,safe_msg);
                                     
                                     while (nleft>0)
                                     {
@@ -255,7 +262,6 @@ my_node.cacheSize=cache_size;
                                     ssize_t nleft,nwritten;       
                                     // Enviar mensagem SAFE com o vizinho externo
                                     char safe_msg[BUFFER_SIZE],*ptr;
-                                    printf("Enviar para a socket %d que é um nó interno %s:%d e agora é o externo a mensagem --> %s",i,my_node.vzext.ip,my_node.vzext.tcp_port,safe_msg);
                                     snprintf(safe_msg, sizeof(safe_msg), "SAFE %s %d\n", 
                                             my_node.vzext.ip, my_node.vzext.tcp_port);
                                             
@@ -287,14 +293,11 @@ my_node.cacheSize=cache_size;
                             }
                         }else if (strncmp(message, "INTEREST",8)==0)
                         {
-                            /* code */
-                            printf("Lida com interesse");
-                            printf("Mensagem recebida: %s\n",message);
                             int temp = handle_interest(&my_node,message+9, i);
 
                             if (temp == 1)
                             {
-                                printf("OBJETO ENCONTRADO ---->> VIVA");
+                                printf("OBJETO ENCONTRADO\n");
                             }
 
                            
@@ -302,22 +305,16 @@ my_node.cacheSize=cache_size;
                         }
                         else if (strncmp(message,"OBJECT",6)==0)
                         {
-                            // printf("\tESTAMOS NA SECCAO OBJECTMensagem recebida: %s\n",message);
                             int temp = handle_object(&my_node,message+7,i);
-                            /* code */
                             
-                            if (temp == 3) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>><Objeto não encontrado");
-                            else if (temp == 2) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>Objeto encontrado");
-                            // printf("Objeto encontrado VIVAAAA");
+                            if (temp == 3) printf("Objeto não encontrado\n");
+                            else if (temp == 2) printf("Objeto encontrado\n");
                         }
                         else if (strncmp(message,"NOOBJECT",8)==0)
                         {
-                            // printf("\tESTAMOS NA SECCAO NOOBJECT Mensagem recebida: %s\n",message);
                             int temp = handle_noobject(&my_node,message+9,i);
-                            if (temp == 3) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>><Objeto não encontrado");
-                            else if (temp == 2) printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>Objeto encontrado");
-                            /* code */
-                            // printf("Objeto não encontrado FUDEUUUUU");
+                            if (temp == 3) printf("Objeto não encontrado\n");
+                            else if (temp == 2) printf("Objeto encontrado\n");
                         }
                         
                         

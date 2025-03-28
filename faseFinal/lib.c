@@ -22,7 +22,6 @@
 void removeInternal(NodeData *mynode, int fdClosed) {
     for (int i = 0; i < 10; i++) {
         if (fdClosed == mynode->intr[i].socket_fd) {
-            // printf("Foi um vizinho interno, remove-o só da lista de internos\n");
             mynode->intr[i].tcp_port = -1;
             mynode->intr[i].socket_fd = -1;
             mynode->intr[i].ip[0] = '\0';
@@ -51,7 +50,6 @@ void promoteRandomInternalToExternal(NodeData *mynode, fd_set *master_fds, int *
     FD_SET(mynode->vzext.socket_fd, master_fds);
 
     updateMaxFD(master_fds, max_fd);
-    // printf("Promovido interno %d a externo.\n", mynode->vzext.tcp_port);
 }
 /* Função: fallbackToSafeguard
    Conecta ao nó de salvaguarda e atualiza o vizinho externo com essa ligação.
@@ -80,6 +78,8 @@ int fallbackToSafeguard(NodeData *mynode, fd_set *master_fds, int *max_fd) {
     sendSafeToAllInternals(mynode);
     return 0;
 }
+
+
 /* Função: sendEntryMessage
    Envia uma mensagem ENTRY ao vizinho externo especificado.
    Parâmetros:
@@ -90,8 +90,9 @@ void sendEntryMessage(NodeData *mynode, int socket_fd) {
     char entry_msg[BUFFER_SIZE];
     snprintf(entry_msg, sizeof(entry_msg), "ENTRY %s %d\n", mynode->ip, mynode->tcp_port);
     writeFull(socket_fd, entry_msg);
-    // printf("ENTRY enviado para %s:%d\n", mynode->vzext.ip, mynode->vzext.tcp_port);
 }
+
+
 /* Função: sendSafeToAllInternals
    Envia uma mensagem SAFE a todos os vizinhos internos.
    Parâmetros:
@@ -106,8 +107,9 @@ void sendSafeToAllInternals(NodeData *mynode) {
             writeFull(mynode->intr[i].socket_fd, safe_msg);
         }
     }
-    // printf("SAFE enviado a todos os internos\n");
 }
+
+
 /* Função: writeFull
    Garante o envio completo de uma mensagem através de uma socket.
    Parâmetros:
@@ -127,6 +129,8 @@ void writeFull(int socket_fd, const char *msg) {
         ptr += nwritten;
     }
 }
+
+
 /* Função: updateMaxFD
    Atualiza o valor do maior descritor de socket (max_fd) usado no conjunto master_fds.
    Parâmetros:
@@ -156,7 +160,6 @@ void updateMaxFD(fd_set *master_fds, int *max_fd) {
 int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
     printf("A limpar tudo\n");
 
-    // strcpy(my_node->net, "xxx");
 
     if (my_node->vzext.socket_fd >= 0) {
         FD_CLR(my_node->vzext.socket_fd, master_fds);
@@ -164,14 +167,12 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
         my_node->vzext.socket_fd = -1;
         strcpy(my_node->vzext.ip, "");
     }
-    printf("Vizinho externo limpo\n");
     if (my_node->vzsalv.socket_fd >= 0) {
         FD_CLR(my_node->vzsalv.socket_fd, master_fds);
         my_node->vzsalv.tcp_port = -1;
         my_node->vzsalv.socket_fd = -1;
         strcpy(my_node->vzsalv.ip, "");
     }
-    printf("Vizinho de salvaguarda limpo\n");
     for (int i = 0; i < 10; i++) {
         if (my_node->intr[i].socket_fd >= 0) {
             FD_CLR(my_node->intr[i].socket_fd, master_fds);
@@ -182,7 +183,6 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
             printf("Vizinho interno %d limpo\n", i);
         }
     }
-    printf("Vizinhos internos limpos\n");
     my_node->numInternals = 0;
     my_node->numInternalsReal = 0;
     // Recalcular max_fd
@@ -193,11 +193,16 @@ int cleanNeighboors(NodeData *my_node, fd_set *master_fds) {
 
         }
     }
-    printf("Tudo limpo\n");
-    // printf("O novo max fd é %d e o fd da socket de listening é %d",new_max_fd,my_node->socket_listening);
     return new_max_fd;
 }
+/* Função: meterTudoAzero
+   Reinicializa todas as variáveis internas do nó, incluindo vizinhos e contadores.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData a ser reinicializada.
+   Retorno:
+    - 0 em caso de sucesso.
 
+*/
 int meterTudoAzero(NodeData *myNode) {
 
    
@@ -226,7 +231,14 @@ int meterTudoAzero(NodeData *myNode) {
     return 0;
 }
 
-
+/* Função add_to_cache
+   Adiciona um objeto à cache do nó, verificando se já existe e se há espaço.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+    - name: nome do objeto a ser adicionado à cache.
+   Retorno:
+    - 1 em caso de sucesso, 0 se o objeto já existe, -1 se a cache está cheia.
+*/
 int add_to_cache(NodeData *myNode, char *name) {
 
 
@@ -252,7 +264,6 @@ int add_to_cache(NodeData *myNode, char *name) {
         }
     }
 
-    printf("Cache cheia, para o nome '%s'.\n", name);
     myNode->cache[myNode->indexCacheFI*100] = '\0'; // Limpa o espaço na cache
     myNode->indexCacheFI++;
     if(myNode->indexCacheFI >= myNode->cacheSize){
@@ -266,7 +277,14 @@ int add_to_cache(NodeData *myNode, char *name) {
     return 0; // Falha ao adicionar
 }
 
+/* Função: printCache
+   Imprime o conteúdo da cache do nó.
+   Parâmetros:
+    - myNode: ponteiro para a estrutura NodeData do nó atual.
+   Retorno:
+    - 0 em caso de sucesso.
 
+*/
 
 int printCache(NodeData *myNode) {
     printf("Cache:\n");
@@ -331,7 +349,6 @@ int init_node(NodeData *myNode, int cache_size) {
         myNode->intr[i].resposta=0;
         myNode->intr[i].espera=0;
         myNode->intr[i].fechado=0;
-        // printf("myNode->intr[i].socket_fd =  %d, Nó interno n%d, a myNode->vzex.socketfd %d, resposta:%d\n",myNode->intr[i].socket_fd,i,myNode->vzext.socket_fd,myNode->intr[i].resposta);
     }
     myNode->numInternalsReal = 0;
     myNode->numInternals = 0;
@@ -339,10 +356,9 @@ int init_node(NodeData *myNode, int cache_size) {
     
     // Inicializar cache e objetos
     myNode->cacheSize = cache_size;
-    myNode->currentCacheSize = 0;
     
     myNode->cache = calloc(cache_size, 100);   // cacheSize blocos de 100 chars
-    myNode->objects = calloc(4, 100);          // 4 blocos de 100 chars
+    myNode->objects = calloc(10, 100);          // 10 blocos de 100 chars
 
 
     myNode->numObjects = 0;
@@ -392,7 +408,7 @@ int init_socket_listening(int port, char *ip) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
         exit(1);
     }
-
+    // Associar o socket ao endereço
     if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
         perror("bind");
         freeaddrinfo(res);
@@ -400,13 +416,13 @@ int init_socket_listening(int port, char *ip) {
     }
 
     freeaddrinfo(res);
-
+    // Definir o socket para escuta
     if (listen(fd, 5) == -1) {
         perror("listen");
         exit(1);
     }
 
-    printf("Nó escutando no porto %s...\n", port_str);
+    printf("Nó à escuta no porto %s...\n", port_str);
     return fd;
 }
 
@@ -425,23 +441,23 @@ int init_socket_listening(int port, char *ip) {
 int connect_to_node(char *ip, int port) {
     struct addrinfo hints, *res;
     int sockfd, errcode;
-    char port_str[6]; // Enough for a 5-digit port number plus null terminator
+    char port_str[6]; 
     
-    // Convert port integer to string
+    // Converter int para string
     snprintf(port_str, sizeof(port_str), "%d", port);
     
-    // Initialize hints structure
+    // Inicializar a estrutura hints
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;      // IPv4
     hints.ai_socktype = SOCK_STREAM; // TCP stream sockets
     
-    // Get address information
+    // Informação do endereço
     if ((errcode = getaddrinfo(ip, port_str, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(errcode));
         return -1;
     }
     
-    // Create socket
+    // Cria a scoket
     sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sockfd < 0) {
         perror("socket");
@@ -449,7 +465,7 @@ int connect_to_node(char *ip, int port) {
         return -1;
     }
     
-    // Connect to the server
+    // Conectar ao servidor
     if (connect(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
         perror("connect");
         close(sockfd);
@@ -457,7 +473,7 @@ int connect_to_node(char *ip, int port) {
         return -1;
     }
     
-    // Free the address info structure
+    // Libertar a memória alocada para a estrutura addrinfo
     freeaddrinfo(res);
     
     return sockfd;
@@ -492,6 +508,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
             exit(1);
         }
     }
+    // Adicionar o novo vizinho
     if (myNode->numInternals == 0)
     {
         myNode->intr[0] = neighbor;
@@ -505,6 +522,7 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
 
     }
     
+    // Adicionar o vizinho interno à lista
     for (int i = 0; i < 10; i++)
     {
         if (myNode->intr[i].socket_fd == -1)
@@ -522,15 +540,4 @@ void add_internal_neighbor(NodeData *myNode, NodeID neighbor) {
         
     }
     
-    // // Adicionar o novo vizinho
-    // myNode->intr[myNode->numInternals] = neighbor;
-    // myNode->numInternalsReal++;
-
-    // if (myNode->numInternalsReal > myNode->numInternals)
-    // {
-    //     myNode->numInternals=myNode->numInternalsReal;
-    // }
-    
-    
-    // printf("Vizinho interno adicionado: %s:%d\n", neighbor.ip, neighbor.tcp_port);
 }
